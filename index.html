@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Камертон — тренування слуху</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #142229;
+    --bg-2: #0f1b21;
+    --panel: #1b3038;
+    --panel-2: #21394262;
+    --panel-line: rgba(238,242,240,0.09);
+    --text: #eef2ef;
+    --muted: #9fb6b0;
+    --muted-2: #6f8c85;
+    --accent: #e8a13c;
+    --accent-dim: #a97730;
+    --good: #7fb89f;
+    --bad: #cf7360;
+    --radius-panel: 18px;
+    --radius-btn: 10px;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+
+  body{
+    background: radial-gradient(circle at 20% -10%, #1a3038 0%, var(--bg) 45%, var(--bg-2) 100%);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    line-height: 1.45;
+  }
+
+  .wrap{
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+
+  header.top{
+    display:flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 26px;
+    flex-wrap: wrap;
+  }
+
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap: 12px;
+  }
+
+  .brand h1{
+    font-family:'Fraunces', serif;
+    font-weight: 600;
+    font-size: 30px;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  .brand .fork{
+    font-size: 26px;
+    transform: rotate(-8deg);
+    display:inline-block;
+  }
+  .brand .tag{
+    color: var(--muted);
+    font-size: 14px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .score{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    display:flex;
+    gap: 18px;
+    align-items:center;
+  }
+  .score b{ color: var(--accent); font-weight:600; }
+  .score button{
+    background: none;
+    border: 1px solid var(--panel-line);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .score button:hover{ color: var(--text); border-color: var(--muted-2); }
+
+  nav.modes{
+    display:flex;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    padding: 5px;
+    margin-bottom: 22px;
+    width: fit-content;
+  }
+  nav.modes button{
+    font-family: 'Inter', sans-serif;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--muted);
+    background: none;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  nav.modes button.active{
+    background: var(--accent);
+    color: #241505;
+  }
+  nav.modes button:not(.active):hover{ color: var(--text); }
+
+  .layout{
+    display:grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 760px){
+    .layout{ grid-template-columns: 1fr; }
+  }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: var(--radius-panel);
+    padding: 20px;
+  }
+
+  .panel h2{
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--muted);
+    margin: 0 0 14px;
+    font-weight: 500;
+  }
+
+  .check-list{
+    display:flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .check-row{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    padding: 7px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    user-select:none;
+  }
+  .check-row:hover{ background: rgba(255,255,255,0.04); }
+  .check-row input{ accent-color: var(--accent); width:15px; height:15px; }
+  .check-row .code{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--muted-2);
+    margin-left: auto;
+  }
+
+  .divider{
+    height:1px;
+    background: var(--panel-line);
+    margin: 16px 0;
+  }
+
+  .radio-row{
+    display:flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .radio-row label{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    padding: 7px 8px;
+    border-radius: 8px;
+    cursor:pointer;
+    font-size: 14px;
+  }
+  .radio-row label:hover{ background: rgba(255,255,255,0.04); }
+  .radio-row input{ accent-color: var(--accent); }
+
+  .stage{
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: var(--radius-panel);
+    padding: 34px 26px;
+    display:flex;
+    flex-direction: column;
+    align-items:center;
+    gap: 22px;
+    min-height: 420px;
+    justify-content: center;
+  }
+
+  .play-btn{
+    width: 108px;
+    height: 108px;
+    border-radius: 50%;
+    background: linear-gradient(160deg, #f0b154, var(--accent-dim));
+    border: none;
+    color: #241505;
+    font-size: 34px;
+    cursor: pointer;
+    box-shadow: 0 0 0 6px rgba(232,161,60,0.08), 0 8px 20px rgba(0,0,0,0.35);
+    transition: transform 0.12s ease;
+  }
+  .play-btn:hover{ transform: scale(1.04); }
+  .play-btn:active{ transform: scale(0.97); }
+  .play-btn:disabled{ opacity: 0.45; cursor: default; transform:none; }
+
+  .replay{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--muted);
+    background:none;
+    border: 1px solid var(--panel-line);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .replay:hover{ color: var(--text); border-color: var(--muted-2); }
+  .replay:disabled{ opacity: 0.4; cursor: default; }
+
+  .prompt{
+    font-family:'Fraunces', serif;
+    font-style: italic;
+    color: var(--muted);
+    font-size: 15px;
+    text-align:center;
+    min-height: 20px;
+  }
+
+  .answers{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    width: 100%;
+    max-width: 640px;
+  }
+  .ans-btn{
+    font-family:'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--bg-2);
+    border: 1px solid var(--panel-line);
+    color: var(--text);
+    padding: 13px 12px;
+    border-radius: var(--radius-btn);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .ans-btn:hover:not(:disabled){ border-color: var(--muted-2); }
+  .ans-btn:disabled{ cursor: default; }
+  .ans-btn.correct{ background: rgba(127,184,159,0.18); border-color: var(--good); color: var(--good); }
+  .ans-btn.wrong{ background: rgba(207,115,96,0.18); border-color: var(--bad); color: var(--bad); }
+  .ans-btn.reveal{ border-color: var(--good); }
+
+  .feedback{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    min-height: 18px;
+    color: var(--muted);
+  }
+  .feedback.good{ color: var(--good); }
+  .feedback.bad{ color: var(--bad); }
+
+  .next-btn{
+    font-family:'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    background: var(--accent);
+    color: #241505;
+    border:none;
+    padding: 10px 22px;
+    border-radius: var(--radius-btn);
+    cursor: pointer;
+    visibility: hidden;
+  }
+  .next-btn.show{ visibility: visible; }
+  .next-btn:hover{ filter: brightness(1.08); }
+
+  .hint{
+    font-size: 12px;
+    color: var(--muted-2);
+    text-align:center;
+    max-width: 480px;
+    margin-top: -6px;
+  }
+
+  footer{
+    text-align:center;
+    color: var(--muted-2);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    margin-top: 34px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <span class="fork">🎵</span>
+      <h1>Камертон</h1>
+      <span class="tag">тренування слуху · безкоштовно</span>
+    </div>
+    <div class="score">
+      <span>вірно: <b id="scoreCorrect">0</b>/<span id="scoreTotal">0</span></span>
+      <span>серія: <b id="scoreStreak">0</b></span>
+      <button id="resetScore" type="button">скинути рахунок</button>
+    </div>
+  </header>
+
+  <nav class="modes">
+    <button class="active" data-mode="intervals">Інтервали</button>
+    <button data-mode="triads">Тризвуки</button>
+    <button data-mode="timbre">Тембри</button>
+  </nav>
+
+  <div class="layout">
+    <div class="panel" id="settingsPanel"></div>
+
+    <div class="stage">
+      <button class="play-btn" id="playBtn" title="Відтворити">▶</button>
+      <button class="replay" id="replayBtn" disabled>відтворити ще раз</button>
+      <div class="prompt" id="prompt">Натисніть кнопку, щоб почути перший приклад</div>
+
+      <div class="answers" id="answers"></div>
+
+      <div class="feedback" id="feedback"></div>
+      <button class="next-btn" id="nextBtn" type="button">Наступне →</button>
+    </div>
+  </div>
+
+  <footer>Звук синтезується прямо у вашому браузері (Web Audio API) — нічого не завантажується і нічого не коштує.</footer>
+</div>
+
+<script>
+(function(){
+
+  // ---------- audio engine ----------
+  let ctx = null;
+  function ensureCtx(){
+    if(!ctx){ ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+    if(ctx.state === 'suspended'){ ctx.resume(); }
+    return ctx;
+  }
+
+  function midiToFreq(m){ return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function playTone(freq, startAt, duration, wave){
+    const c = ensureCtx();
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = wave || 'sine';
+    osc.frequency.value = freq;
+    const t0 = c.currentTime + startAt;
+    const attack = 0.02, release = 0.15;
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(0.28, t0 + attack);
+    gain.gain.setValueAtTime(0.28, t0 + duration - release);
+    gain.gain.linearRampToValueAtTime(0, t0 + duration);
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+
+  function playSequence(freqs, wave, mode){
+    // mode: 'up'|'down'|'together'|'arp'
+    const dur = 1.0;
+    if(mode === 'together'){
+      freqs.forEach(f => playTone(f, 0, dur + 0.4, wave));
+    } else {
+      const gap = 0.85;
+      freqs.forEach((f, i) => playTone(f, i * gap, dur, wave));
+    }
+  }
+
+  // ---------- data ----------
+  const INTERVALS = [
+    {code:'m2', semis:1,  label:'мала друга'},
+    {code:'M2', semis:2,  label:'велика друга'},
+    {code:'m3', semis:3,  label:'мала терція'},
+    {code:'M3', semis:4,  label:'велика терція'},
+    {code:'P4', semis:5,  label:'чиста кварта'},
+    {code:'TT', semis:6,  label:'тритон'},
+    {code:'P5', semis:7,  label:'чиста квінта'},
+    {code:'m6', semis:8,  label:'мала секста'},
+    {code:'M6', semis:9,  label:'велика секста'},
+    {code:'m7', semis:10, label:'мала септима'},
+    {code:'M7', semis:11, label:'велика септима'},
+    {code:'P8', semis:12, label:'октава'}
+  ];
+
+  const TRIADS = [
+    {code:'maj', semis:[0,4,7], label:'мажорний'},
+    {code:'min', semis:[0,3,7], label:'мінорний'},
+    {code:'dim', semis:[0,3,6], label:'зменшений'},
+    {code:'aug', semis:[0,4,8], label:'збільшений'}
+  ];
+
+  const TIMBRES = [
+    {code:'sine',     wave:'sine',     label:'синусоїда', hint:'м’який, "чистий" звук'},
+    {code:'triangle', wave:'triangle', label:'трикутна',  hint:'округлий, приглушений'},
+    {code:'square',   wave:'square',   label:'прямокутна', hint:'різкий, "цифровий"'},
+    {code:'sawtooth', wave:'sawtooth', label:'пилкоподібна', hint:'гострий, дзижчний'}
+  ];
+
+  // ---------- state ----------
+  const state = {
+    mode: 'intervals',
+    enabled: {
+      intervals: new Set(INTERVALS.map(i=>i.code)),
+      triads: new Set(TRIADS.map(t=>t.code)),
+      timbre: new Set(TIMBRES.map(t=>t.code))
+    },
+    direction: 'up',        // for intervals: up | down | together
+    chordStyle: 'block',    // for triads: block | arp
+    current: null,          // { correctCode, freqs, wave }
+    answered: false,
+    score: { correct: 0, total: 0, streak: 0 }
+  };
+
+  // ---------- DOM refs ----------
+  const settingsPanel = document.getElementById('settingsPanel');
+  const answersEl = document.getElementById('answers');
+  const promptEl = document.getElementById('prompt');
+  const feedbackEl = document.getElementById('feedback');
+  const playBtn = document.getElementById('playBtn');
+  const replayBtn = document.getElementById('replayBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const scoreCorrect = document.getElementById('scoreCorrect');
+  const scoreTotal = document.getElementById('scoreTotal');
+  const scoreStreak = document.getElementById('scoreStreak');
+
+  function renderScore(){
+    scoreCorrect.textContent = state.score.correct;
+    scoreTotal.textContent = state.score.total;
+    scoreStreak.textContent = state.score.streak;
+  }
+
+  document.getElementById('resetScore').addEventListener('click', ()=>{
+    state.score = { correct:0, total:0, streak:0 };
+    renderScore();
+  });
+
+  // ---------- settings panel rendering ----------
+  function renderSettings(){
+    settingsPanel.innerHTML = '';
+
+    if(state.mode === 'intervals'){
+      settingsPanel.appendChild(buildChecklist('Які інтервали тренувати', INTERVALS, state.enabled.intervals));
+      settingsPanel.appendChild(divider());
+      settingsPanel.appendChild(buildRadio('Напрямок відтворення', [
+        {v:'up', l:'вгору (спочатку нижча нота)'},
+        {v:'down', l:'вниз (спочатку вища нота)'},
+        {v:'together', l:'разом (як акорд)'}
+      ], state.direction, v => state.direction = v));
+    }
+
+    if(state.mode === 'triads'){
+      settingsPanel.appendChild(buildChecklist('Які тризвуки тренувати', TRIADS, state.enabled.triads));
+      settingsPanel.appendChild(divider());
+      settingsPanel.appendChild(buildRadio('Спосіб відтворення', [
+        {v:'block', l:'блок-акорд (всі ноти разом)'},
+        {v:'arp', l:'арпеджіо (по черзі вгору)'}
+      ], state.chordStyle, v => state.chordStyle = v));
+    }
+
+    if(state.mode === 'timbre'){
+      settingsPanel.appendChild(buildChecklist('Які тембри тренувати', TIMBRES.map(t=>({code:t.code,label:t.label})), state.enabled.timbre));
+      const p = document.createElement('p');
+      p.className = 'hint';
+      p.style.marginTop = '12px';
+      p.textContent = 'Тут "тембр" — це форма хвилі синтезатора, а не звук реального інструмента.';
+      settingsPanel.appendChild(p);
+    }
+  }
+
+  function buildChecklist(title, items, enabledSet){
+    const box = document.createElement('div');
+    const h = document.createElement('h2');
+    h.textContent = title;
+    box.appendChild(h);
+    const list = document.createElement('div');
+    list.className = 'check-list';
+    items.forEach(item=>{
+      const row = document.createElement('label');
+      row.className = 'check-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = enabledSet.has(item.code);
+      cb.addEventListener('change', ()=>{
+        if(cb.checked) enabledSet.add(item.code); else enabledSet.delete(item.code);
+      });
+      const span = document.createElement('span');
+      span.textContent = item.label;
+      const code = document.createElement('span');
+      code.className = 'code';
+      code.textContent = item.code;
+      row.appendChild(cb);
+      row.appendChild(span);
+      row.appendChild(code);
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+    return box;
+  }
+
+  function buildRadio(title, options, current, onChange){
+    const box = document.createElement('div');
+    const h = document.createElement('h2');
+    h.textContent = title;
+    box.appendChild(h);
+    const wrap = document.createElement('div');
+    wrap.className = 'radio-row';
+    options.forEach(opt=>{
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = title;
+      input.checked = opt.v === current;
+      input.addEventListener('change', ()=> onChange(opt.v));
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(opt.l));
+      wrap.appendChild(label);
+    });
+    box.appendChild(wrap);
+    return box;
+  }
+
+  function divider(){
+    const d = document.createElement('div');
+    d.className = 'divider';
+    return d;
+  }
+
+  // ---------- round logic ----------
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+  function enabledList(){
+    if(state.mode === 'intervals') return INTERVALS.filter(i => state.enabled.intervals.has(i.code));
+    if(state.mode === 'triads') return TRIADS.filter(t => state.enabled.triads.has(t.code));
+    if(state.mode === 'timbre') return TIMBRES.filter(t => state.enabled.timbre.has(t.code));
+  }
+
+  function buildRound(){
+    const pool = enabledList();
+    if(pool.length === 0){
+      promptEl.textContent = 'Оберіть хоча б один варіант у налаштуваннях зліва.';
+      answersEl.innerHTML = '';
+      return null;
+    }
+
+    if(state.mode === 'intervals'){
+      const item = pick(pool);
+      const rootMidi = 55 + Math.floor(Math.random()*12); // G3..F#4
+      const rootFreq = midiToFreq(rootMidi);
+      const otherFreq = midiToFreq(rootMidi + item.semis);
+      let freqs;
+      if(state.direction === 'down') freqs = [otherFreq, rootFreq];
+      else freqs = [rootFreq, otherFreq];
+      return { code: item.code, freqs, wave: 'sine', playMode: state.direction === 'together' ? 'together' : 'seq', pool };
+    }
+
+    if(state.mode === 'triads'){
+      const item = pick(pool);
+      const rootMidi = 52 + Math.floor(Math.random()*10); // E3..A#3-ish
+      const freqs = item.semis.map(s => midiToFreq(rootMidi + s));
+      return { code: item.code, freqs, wave: 'triangle', playMode: state.chordStyle === 'block' ? 'together' : 'seq', pool };
+    }
+
+    if(state.mode === 'timbre'){
+      const item = pick(pool);
+      const midi = 64 + Math.floor(Math.random()*6) - 3; // around E4
+      const freq = midiToFreq(midi);
+      return { code: item.code, freqs: [freq], wave: item.wave, playMode: 'together', pool };
+    }
+  }
+
+  function labelFor(mode, code){
+    const src = mode === 'intervals' ? INTERVALS : mode === 'triads' ? TRIADS : TIMBRES;
+    const found = src.find(x => x.code === code);
+    return found ? found.label : code;
+  }
+
+  function renderAnswers(round){
+    answersEl.innerHTML = '';
+    round.pool.forEach(item=>{
+      const btn = document.createElement('button');
+      btn.className = 'ans-btn';
+      btn.textContent = item.label;
+      btn.dataset.code = item.code;
+      btn.disabled = true; // enabled after first play
+      btn.addEventListener('click', ()=> handleAnswer(item.code, btn));
+      answersEl.appendChild(btn);
+    });
+  }
+
+  function playCurrent(){
+    if(!state.current) return;
+    const c = state.current;
+    playSequence(c.freqs, c.wave, c.playMode === 'together' ? 'together' : 'up');
+    replayBtn.disabled = false;
+    if(!state.answered){
+      answersEl.querySelectorAll('.ans-btn').forEach(b => b.disabled = false);
+    }
+  }
+
+  function newRound(){
+    state.answered = false;
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'feedback';
+    nextBtn.classList.remove('show');
+    replayBtn.disabled = true;
+
+    const round = buildRound();
+    if(!round){ state.current = null; return; }
+    state.current = round;
+    renderAnswers(round);
+    promptEl.textContent = 'Натисніть ▶, щоб почути приклад';
+    playCurrent();
+  }
+
+  function handleAnswer(code, btn){
+    if(state.answered || !state.current) return;
+    state.answered = true;
+    const correctCode = state.current.code;
+    const isCorrect = code === correctCode;
+
+    state.score.total += 1;
+    if(isCorrect){
+      state.score.correct += 1;
+      state.score.streak += 1;
+      btn.classList.add('correct');
+      feedbackEl.textContent = 'Правильно — ' + labelFor(state.mode, correctCode) + '.';
+      feedbackEl.className = 'feedback good';
+    } else {
+      state.score.streak = 0;
+      btn.classList.add('wrong');
+      feedbackEl.textContent = 'Не зовсім. Правильна відповідь: ' + labelFor(state.mode, correctCode) + '.';
+      feedbackEl.className = 'feedback bad';
+      const correctBtn = answersEl.querySelector('[data-code="'+correctCode+'"]');
+      if(correctBtn) correctBtn.classList.add('reveal');
+    }
+    renderScore();
+
+    answersEl.querySelectorAll('.ans-btn').forEach(b => b.disabled = true);
+    nextBtn.classList.add('show');
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    if(!state.current){ newRound(); }
+    else { playCurrent(); }
+  });
+  replayBtn.addEventListener('click', playCurrent);
+  nextBtn.addEventListener('click', newRound);
+
+  document.querySelectorAll('nav.modes button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('nav.modes button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state.mode = btn.dataset.mode;
+      renderSettings();
+      state.current = null;
+      answersEl.innerHTML = '';
+      feedbackEl.textContent = '';
+      nextBtn.classList.remove('show');
+      replayBtn.disabled = true;
+      promptEl.textContent = 'Натисніть ▶, щоб почути приклад';
+    });
+  });
+
+  renderSettings();
+  renderScore();
+})();
+</script>
+</body>
+</html>
