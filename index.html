@@ -385,9 +385,9 @@
   ];
 
   const DIRECTIONS = [
-    {code:'up', label:'вгору (спочатку нижча нота)'},
-    {code:'down', label:'вниз (спочатку вища нота)'},
-    {code:'together', label:'разом (як акорд)'}
+    {code:'up', label:'висхідні'},
+    {code:'down', label:'низхідні'},
+    {code:'together', label:'разом'}
   ];
 
   const TRIADS = [
@@ -404,9 +404,9 @@
   ];
 
   const CHORD_STYLES = [
-    {code:'block', label:'блок-акорд (всі ноти разом)'},
-    {code:'arp-up', label:'арпеджіо по черзі вгору'},
-    {code:'arp-down', label:'арпеджіо по черзі вниз'}
+    {code:'block', label:'акорд'},
+    {code:'arp-up', label:'арпеджіо висхідне'},
+    {code:'arp-down', label:'арпеджіо низхідне'}
   ];
 
   const TIMBRES = [
@@ -491,7 +491,7 @@
     if(state.mode === 'intervals'){
       settingsPanel.appendChild(buildChecklist('Які інтервали тренувати', INTERVALS, state.enabled.intervals, {selectAll:true}));
       settingsPanel.appendChild(divider());
-      settingsPanel.appendChild(buildChecklist('Напрямок відтворення', DIRECTIONS, state.enabled.direction));
+      settingsPanel.appendChild(buildChecklist('Спосіб відтворення', DIRECTIONS, state.enabled.direction));
     }
 
     if(state.mode === 'triads'){
