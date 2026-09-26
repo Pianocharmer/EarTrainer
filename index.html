@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
 <style>
   :root{
     --bg: #142229;
@@ -56,7 +57,7 @@
 
   nav.modes{
     display:flex; gap: 6px; background: var(--panel); border: 1px solid var(--panel-line);
-    border-radius: 14px; padding: 5px; margin-bottom: 22px; width: fit-content;
+    border-radius: 14px; padding: 5px; margin-bottom: 22px; width: fit-content; flex-wrap: wrap;
   }
   nav.modes button{
     font-family: 'Inter', sans-serif; font-size: 14.5px; font-weight: 500; color: var(--muted);
@@ -81,12 +82,19 @@
   .mini-btn:hover{ color: var(--text); border-color: var(--muted-2); }
 
   .check-list{ display:flex; flex-direction: column; gap: 4px; }
-  .check-row{ display:flex; align-items:center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 14px; user-select:none; }
+  .check-row{ display:flex; align-items:center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 14px; user-select:none; flex-wrap: wrap; }
   .check-row:hover{ background: rgba(255,255,255,0.04); }
   .check-row input{ accent-color: var(--accent); width:15px; height:15px; }
   .check-row .code{ font-family:'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted-2); margin-left: auto; }
+  .check-row .wafstatus{ font-family:'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted-2); }
+  .check-row .wafstatus.ready{ color: var(--good); }
 
   .divider{ height:1px; background: var(--panel-line); margin: 16px 0; }
+
+  .radio-row{ display:flex; flex-direction: column; gap: 4px; }
+  .radio-row label{ display:flex; align-items:center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor:pointer; font-size: 14px; }
+  .radio-row label:hover{ background: rgba(255,255,255,0.04); }
+  .radio-row input{ accent-color: var(--accent); }
 
   .num-input{
     width: 100%; background: var(--bg-2); border: 1px solid var(--panel-line); color: var(--text);
@@ -103,6 +111,9 @@
   .series-progress{ font-family:'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted-2); letter-spacing: 0.3px; }
 
   #stageContent{ display:flex; flex-direction: column; align-items:center; gap: 20px; width:100%; }
+  .stage-controls-row{ display:flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+  #soundInfo{ max-width: 480px; text-align:center; color: var(--muted); font-family:'Fraunces', serif; font-style: italic; font-size: 16px; line-height:1.6; }
 
   .play-btn{
     width: 108px; height: 108px; border-radius: 50%;
@@ -201,6 +212,7 @@
     <button class="active" data-mode="intervals">Інтервали</button>
     <button data-mode="triads">Тризвуки</button>
     <button data-mode="timbre">Тембри</button>
+    <button data-mode="sound">Звук</button>
   </nav>
 
   <div class="layout">
@@ -211,7 +223,10 @@
 
       <div id="stageContent">
         <button class="play-btn" id="playBtn" title="Відтворити">▶</button>
-        <button class="replay" id="replayBtn" disabled>відтворити ще раз</button>
+        <div class="stage-controls-row">
+          <button class="replay" id="replayBtn" disabled>відтворити ще раз</button>
+          <button class="replay" id="resetSeriesBtn" type="button" title="Почати серію з початку">скинути серію</button>
+        </div>
         <div class="prompt" id="prompt">Натисніть кнопку, щоб почути перший приклад</div>
         <div class="answers" id="answers"></div>
         <div class="feedback" id="feedback"></div>
@@ -219,16 +234,20 @@
       </div>
 
       <div class="summary" id="summaryPanel" style="display:none;"></div>
+
+      <div id="soundInfo" style="display:none;">
+        Ця вкладка налаштовує, яким звуком гратимуть приклади в розділах «Інтервали» та «Тризвуки» — синтезованими хвилями або семплами реальних інструментів. Тренуватися можна в інших вкладках.
+      </div>
     </div>
   </div>
 
-  <footer>Звук синтезується прямо у вашому браузері (Web Audio API), нічого не завантажується і нічого не коштує.</footer>
+  <footer>Звук синтезується прямо у вашому браузері (Web Audio API) — нічого не завантажується і нічого не коштує.</footer>
 </div>
 
 <script>
 (function(){
 
-  // ---------- audio engine ----------
+  // ---------- synth audio engine ----------
   let ctx = null;
   function ensureCtx(){
     if(!ctx){ ctx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -256,13 +275,96 @@
     osc.stop(t0 + duration + 0.02);
   }
 
-  function playSequence(freqs, wave, mode){
+  function playSynthSequence(freqs, wave, mode){
     const dur = 1.0;
     if(mode === 'together'){
       freqs.forEach(f => playTone(f, 0, dur + 0.4, wave));
     } else {
       const gap = 0.85;
       freqs.forEach((f, i) => playTone(f, i * gap, dur, wave));
+    }
+  }
+
+  // ---------- WebAudioFont (real instrument samples) ----------
+  const SOUNDS_BASE = 'https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/';
+  const INSTRUMENTS = [
+    {code:'piano1',     label:'Фортепіано (концертне)',  file:'0000_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0000_FluidR3_GM_sf2_file.js'},
+    {code:'piano2',     label:'Фортепіано (тембр 2)',    file:'0000_GeneralUserGS_sf2_file',  url: SOUNDS_BASE + '0000_GeneralUserGS_sf2_file.js'},
+    {code:'piano3',     label:'Фортепіано (яскраве)',     file:'0010_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0010_FluidR3_GM_sf2_file.js'},
+    {code:'harpsichord',label:'Клавесин',                 file:'0060_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0060_FluidR3_GM_sf2_file.js'},
+    {code:'epiano1',    label:'Електропіано (тембр 1)',   file:'0040_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0040_FluidR3_GM_sf2_file.js'},
+    {code:'epiano2',    label:'Електропіано (тембр 2)',   file:'0050_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0050_FluidR3_GM_sf2_file.js'},
+    {code:'guitar',     label:'Гітара',                   file:'0240_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0240_FluidR3_GM_sf2_file.js'},
+    {code:'bass',       label:'Бас-гітара',               file:'0330_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0330_FluidR3_GM_sf2_file.js'},
+    {code:'violin',     label:'Скрипка',                  file:'0400_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0400_FluidR3_GM_sf2_file.js'},
+    {code:'flute',      label:'Флейта',                   file:'0730_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0730_FluidR3_GM_sf2_file.js'},
+    {code:'organ',      label:'Орган',                    file:'0190_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0190_FluidR3_GM_sf2_file.js'}
+  ];
+
+  let wafPlayer = null;
+  function ensureWafPlayer(){
+    if(!wafPlayer && window.WebAudioFontPlayer){ wafPlayer = new WebAudioFontPlayer(); }
+    return wafPlayer;
+  }
+
+  const loadedInstruments = {};
+  const loadQueue = [];
+  let loadingInProgress = false;
+  let currentlyLoadingCode = null;
+
+  function instrumentStatusText(code){
+    if(loadedInstruments[code]) return 'готово';
+    if(currentlyLoadingCode === code || loadQueue.indexOf(code) !== -1) return 'завантажується…';
+    return 'не завантажено';
+  }
+
+  function updateLoadStatus(code){
+    const el = document.getElementById('wafstatus-' + code);
+    if(!el) return;
+    el.textContent = instrumentStatusText(code);
+    el.classList.toggle('ready', !!loadedInstruments[code]);
+  }
+
+  function processLoadQueue(){
+    if(loadingInProgress) return;
+    const code = loadQueue.shift();
+    if(!code){ currentlyLoadingCode = null; return; }
+    if(loadedInstruments[code]){ processLoadQueue(); return; }
+    currentlyLoadingCode = code;
+    loadingInProgress = true;
+    updateLoadStatus(code);
+    const info = INSTRUMENTS.find(i => i.code === code);
+    const c = ensureCtx();
+    const wp = ensureWafPlayer();
+    if(!wp || !info){ loadingInProgress = false; processLoadQueue(); return; }
+    const varName = '_tone_' + info.file;
+    wp.loader.startLoad(c, info.url, varName);
+    wp.loader.waitLoad(function(){
+      loadedInstruments[code] = window[varName];
+      loadingInProgress = false;
+      updateLoadStatus(code);
+      processLoadQueue();
+    });
+  }
+
+  function queueLoadInstrument(code){
+    if(loadedInstruments[code] || loadQueue.indexOf(code) !== -1) { updateLoadStatus(code); return; }
+    loadQueue.push(code);
+    updateLoadStatus(code);
+    processLoadQueue();
+  }
+
+  function playLibrarySequence(midiNotes, code, mode){
+    const c = ensureCtx();
+    const wp = ensureWafPlayer();
+    const preset = loadedInstruments[code];
+    if(!wp || !preset) return;
+    const dur = 1.1;
+    if(mode === 'together'){
+      midiNotes.forEach(m => wp.queueWaveTable(c, c.destination, preset, 0, m, dur + 0.4, 0.7));
+    } else {
+      const gap = 0.85;
+      midiNotes.forEach((m, i) => wp.queueWaveTable(c, c.destination, preset, i * gap, m, dur, 0.7));
     }
   }
 
@@ -308,10 +410,10 @@
   ];
 
   const TIMBRES = [
-    {code:'sine',     wave:'sine',     label:'синусоїда', hint:'м’який, "чистий" звук'},
-    {code:'triangle', wave:'triangle', label:'трикутна',  hint:'округлий, приглушений'},
-    {code:'square',   wave:'square',   label:'прямокутна', hint:'різкий, "цифровий"'},
-    {code:'sawtooth', wave:'sawtooth', label:'пилкоподібна', hint:'гострий, дзижчний'}
+    {code:'sine',     wave:'sine',     label:'синусоїда'},
+    {code:'triangle', wave:'triangle', label:'трикутна'},
+    {code:'square',   wave:'square',   label:'прямокутна'},
+    {code:'sawtooth', wave:'sawtooth', label:'пилкоподібна'}
   ];
 
   function chordVoicing(semis, invCode){
@@ -324,17 +426,16 @@
   // ---------- state ----------
   const state = {
     mode: 'intervals',
+    soundEngine: 'synth',
     enabled: {
       intervals: new Set(INTERVALS.map(i=>i.code)),
       direction: new Set(DIRECTIONS.map(d=>d.code)),
       triads: new Set(TRIADS.map(t=>t.code)),
       chordStyle: new Set(CHORD_STYLES.map(s=>s.code)),
       timbre: new Set(TIMBRES.map(t=>t.code)),
-      inversions: new Set(['root','inv1','inv2'])
-    },
-    trainingWave: {
-      intervals: new Set(TIMBRES.map(t=>t.code)),
-      triads: new Set(TIMBRES.map(t=>t.code))
+      inversions: new Set(['root','inv1','inv2']),
+      waveforms: new Set(TIMBRES.map(t=>t.code)),
+      instruments: new Set(INSTRUMENTS.map(i=>i.code))
     },
     seriesLength: 10,
     seriesIndex: 0,
@@ -351,6 +452,7 @@
   const feedbackEl = document.getElementById('feedback');
   const playBtn = document.getElementById('playBtn');
   const replayBtn = document.getElementById('replayBtn');
+  const resetSeriesBtn = document.getElementById('resetSeriesBtn');
   const nextBtn = document.getElementById('nextBtn');
   const scoreCorrect = document.getElementById('scoreCorrect');
   const scoreTotal = document.getElementById('scoreTotal');
@@ -358,6 +460,7 @@
   const seriesProgress = document.getElementById('seriesProgress');
   const stageContent = document.getElementById('stageContent');
   const summaryPanel = document.getElementById('summaryPanel');
+  const soundInfo = document.getElementById('soundInfo');
 
   function renderScore(){
     scoreCorrect.textContent = state.score.correct;
@@ -380,15 +483,15 @@
   function renderSettings(){
     settingsPanel.innerHTML = '';
 
-    settingsPanel.appendChild(buildSeriesLengthControl());
-    settingsPanel.appendChild(divider());
+    if(state.mode !== 'sound'){
+      settingsPanel.appendChild(buildSeriesLengthControl());
+      settingsPanel.appendChild(divider());
+    }
 
     if(state.mode === 'intervals'){
       settingsPanel.appendChild(buildChecklist('Які інтервали тренувати', INTERVALS, state.enabled.intervals, {selectAll:true}));
       settingsPanel.appendChild(divider());
       settingsPanel.appendChild(buildChecklist('Напрямок відтворення', DIRECTIONS, state.enabled.direction));
-      settingsPanel.appendChild(divider());
-      settingsPanel.appendChild(buildChecklist('Тембр звучання', TIMBRES, state.trainingWave.intervals));
     }
 
     if(state.mode === 'triads'){
@@ -397,8 +500,6 @@
       settingsPanel.appendChild(buildChecklist('Спосіб відтворення', CHORD_STYLES, state.enabled.chordStyle));
       settingsPanel.appendChild(divider());
       settingsPanel.appendChild(buildChecklist('Обернення тризвуків', TRIAD_INVERSIONS, state.enabled.inversions));
-      settingsPanel.appendChild(divider());
-      settingsPanel.appendChild(buildChecklist('Тембр звучання', TIMBRES, state.trainingWave.triads));
     }
 
     if(state.mode === 'timbre'){
@@ -408,6 +509,34 @@
       p.style.marginTop = '12px';
       p.textContent = 'Тут "тембр" — це форма хвилі синтезатора, а не звук реального інструмента.';
       settingsPanel.appendChild(p);
+    }
+
+    if(state.mode === 'sound'){
+      settingsPanel.appendChild(buildRadio('Джерело звуку', [
+        {v:'synth', l:'Синтезовані хвилі'},
+        {v:'library', l:'Реальні інструменти (бібліотека)'}
+      ], state.soundEngine, v=>{ state.soundEngine = v; renderSettings(); }));
+      settingsPanel.appendChild(divider());
+
+      if(state.soundEngine === 'synth'){
+        settingsPanel.appendChild(buildChecklist('Тембри (форми хвилі)', TIMBRES, state.enabled.waveforms));
+        const p = document.createElement('p');
+        p.className = 'hint';
+        p.style.marginTop = '12px';
+        p.textContent = 'Цим звуком гратимуть приклади в "Інтервалах" і "Тризвуках".';
+        settingsPanel.appendChild(p);
+      } else {
+        settingsPanel.appendChild(buildChecklist('Інструменти', INSTRUMENTS, state.enabled.instruments, {
+          statusFn: instrumentStatusText,
+          onCheck: (code, checked) => { if(checked) queueLoadInstrument(code); }
+        }));
+        state.enabled.instruments.forEach(code => queueLoadInstrument(code));
+        const p = document.createElement('p');
+        p.className = 'hint';
+        p.style.marginTop = '12px';
+        p.textContent = 'Ноти завантажуються з відкритої бібліотеки WebAudioFont (вільна ліцензія, можна використовувати безкоштовно, зокрема для навчання). Потрібне інтернет-з’єднання під час завантаження.';
+        settingsPanel.appendChild(p);
+      }
     }
   }
 
@@ -480,18 +609,51 @@
       cb.checked = enabledSet.has(item.code);
       cb.addEventListener('change', ()=>{
         if(cb.checked) enabledSet.add(item.code); else enabledSet.delete(item.code);
+        if(opts.onCheck) opts.onCheck(item.code, cb.checked);
       });
       const span = document.createElement('span');
       span.textContent = item.label;
-      const code = document.createElement('span');
-      code.className = 'code';
-      code.textContent = item.code;
       row.appendChild(cb);
       row.appendChild(span);
-      row.appendChild(code);
+      if(opts.statusFn){
+        const status = document.createElement('span');
+        status.className = 'wafstatus';
+        status.id = 'wafstatus-' + item.code;
+        status.textContent = opts.statusFn(item.code);
+        if(loadedInstruments[item.code]) status.classList.add('ready');
+        row.appendChild(status);
+      } else {
+        const code = document.createElement('span');
+        code.className = 'code';
+        code.textContent = item.code;
+        row.appendChild(code);
+      }
       list.appendChild(row);
     });
     box.appendChild(list);
+    return box;
+  }
+
+  function buildRadio(title, options, current, onChange){
+    const box = document.createElement('div');
+    const h = document.createElement('h2');
+    h.style.marginBottom = '14px';
+    h.textContent = title;
+    box.appendChild(h);
+    const wrap = document.createElement('div');
+    wrap.className = 'radio-row';
+    options.forEach(opt=>{
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = title + '-radio';
+      input.checked = opt.v === current;
+      input.addEventListener('change', ()=> onChange(opt.v));
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(opt.l));
+      wrap.appendChild(label);
+    });
+    box.appendChild(wrap);
     return box;
   }
 
@@ -510,6 +672,24 @@
     if(state.mode === 'timbre') return TIMBRES.filter(t => state.enabled.timbre.has(t.code));
   }
 
+  function pickSoundForTrainingRound(){
+    if(state.soundEngine === 'synth'){
+      const wavePool = TIMBRES.filter(t => state.enabled.waveforms.has(t.code));
+      if(wavePool.length === 0){
+        return { error: 'Оберіть хоча б один тембр звучання у вкладці «Звук».' };
+      }
+      return { soundPick: { kind:'synth', wave: pick(wavePool).wave } };
+    }
+    const instrPool = INSTRUMENTS.filter(i => state.enabled.instruments.has(i.code) && loadedInstruments[i.code]);
+    if(instrPool.length === 0){
+      const anyEnabled = INSTRUMENTS.some(i => state.enabled.instruments.has(i.code));
+      return { error: anyEnabled
+        ? 'Зачекайте, поки завантажаться обрані інструменти (вкладка «Звук»), і спробуйте ще раз.'
+        : 'Оберіть хоча б один інструмент у вкладці «Звук».' };
+    }
+    return { soundPick: { kind:'library', code: pick(instrPool).code } };
+  }
+
   function buildRound(){
     const pool = enabledList();
     if(pool.length === 0){
@@ -525,22 +705,19 @@
         answersEl.innerHTML = '';
         return null;
       }
-      const wavePool = TIMBRES.filter(t => state.trainingWave.intervals.has(t.code));
-      if(wavePool.length === 0){
-        promptEl.textContent = 'Оберіть хоча б один тембр звучання у налаштуваннях зліва.';
+      const soundResult = pickSoundForTrainingRound();
+      if(soundResult.error){
+        promptEl.textContent = soundResult.error;
         answersEl.innerHTML = '';
         return null;
       }
       const item = pick(pool);
       const dir = pick(dirPool).code;
-      const wave = pick(wavePool).wave;
       const rootMidi = 55 + Math.floor(Math.random()*12);
-      const rootFreq = midiToFreq(rootMidi);
-      const otherFreq = midiToFreq(rootMidi + item.semis);
-      let freqs;
-      if(dir === 'down') freqs = [otherFreq, rootFreq];
-      else freqs = [rootFreq, otherFreq];
-      return { code: item.code, freqs, wave, playMode: dir === 'together' ? 'together' : 'seq', pool };
+      let midiNotes;
+      if(dir === 'down') midiNotes = [rootMidi + item.semis, rootMidi];
+      else midiNotes = [rootMidi, rootMidi + item.semis];
+      return { code: item.code, midiNotes, soundPick: soundResult.soundPick, playMode: dir === 'together' ? 'together' : 'seq', pool };
     }
 
     if(state.mode === 'triads'){
@@ -556,30 +733,28 @@
         answersEl.innerHTML = '';
         return null;
       }
-      const wavePool = TIMBRES.filter(t => state.trainingWave.triads.has(t.code));
-      if(wavePool.length === 0){
-        promptEl.textContent = 'Оберіть хоча б один тембр звучання у налаштуваннях зліва.';
+      const soundResult = pickSoundForTrainingRound();
+      if(soundResult.error){
+        promptEl.textContent = soundResult.error;
         answersEl.innerHTML = '';
         return null;
       }
       const item = pick(pool);
       const invItem = pick(invPool);
       const style = pick(stylePool).code;
-      const wave = pick(wavePool).wave;
       const rootMidi = 50 + Math.floor(Math.random()*9);
       let voicing = chordVoicing(item.semis, invItem.code);
       let playMode = 'seq';
       if(style === 'block'){ playMode = 'together'; }
       else if(style === 'arp-down'){ voicing = voicing.slice().reverse(); }
-      const freqs = voicing.map(s => midiToFreq(rootMidi + s));
-      return { code: item.code, freqs, wave, playMode, pool };
+      const midiNotes = voicing.map(s => rootMidi + s);
+      return { code: item.code, midiNotes, soundPick: soundResult.soundPick, playMode, pool };
     }
 
     if(state.mode === 'timbre'){
       const item = pick(pool);
       const midi = 64 + Math.floor(Math.random()*6) - 3;
-      const freq = midiToFreq(midi);
-      return { code: item.code, freqs: [freq], wave: item.wave, playMode: 'together', pool };
+      return { code: item.code, midiNotes: [midi], soundPick: { kind:'synth', wave: item.wave }, playMode: 'together', pool };
     }
   }
 
@@ -605,7 +780,12 @@
   function playCurrent(){
     if(!state.current) return;
     const c = state.current;
-    playSequence(c.freqs, c.wave, c.playMode === 'together' ? 'together' : 'up');
+    if(c.soundPick.kind === 'synth'){
+      const freqs = c.midiNotes.map(midiToFreq);
+      playSynthSequence(freqs, c.soundPick.wave, c.playMode === 'together' ? 'together' : 'up');
+    } else {
+      playLibrarySequence(c.midiNotes, c.soundPick.code, c.playMode);
+    }
     replayBtn.disabled = false;
     if(!state.answered){
       answersEl.querySelectorAll('.ans-btn').forEach(b => b.disabled = false);
@@ -789,6 +969,10 @@
     else { playCurrent(); }
   });
   replayBtn.addEventListener('click', playCurrent);
+  resetSeriesBtn.addEventListener('click', ()=>{
+    resetSeries();
+    startRound();
+  });
   nextBtn.addEventListener('click', ()=>{
     if(state.seriesIndex >= state.seriesLength){ showSummary(); }
     else { startRound(); }
@@ -800,7 +984,16 @@
       btn.classList.add('active');
       state.mode = btn.dataset.mode;
       renderSettings();
-      resetSeries();
+      if(state.mode === 'sound'){
+        stageContent.style.display = 'none';
+        summaryPanel.style.display = 'none';
+        soundInfo.style.display = '';
+        seriesProgress.textContent = '';
+        state.current = null;
+      } else {
+        soundInfo.style.display = 'none';
+        resetSeries();
+      }
     });
   });
 
