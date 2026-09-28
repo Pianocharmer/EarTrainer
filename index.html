@@ -55,6 +55,15 @@
   }
   .score button:hover{ color: var(--text); border-color: var(--muted-2); }
 
+  .lang-switch{ display:flex; gap: 4px; margin-left: 6px; }
+  .lang-btn{
+    font-family:'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 600; letter-spacing: 0.3px;
+    color: var(--muted); background: none; border: 1px solid var(--panel-line);
+    padding: 5px 9px; border-radius: 8px; cursor: pointer;
+  }
+  .lang-btn:hover{ color: var(--text); border-color: var(--muted-2); }
+  .lang-btn.active{ background: var(--accent); color: #241505; border-color: var(--accent); }
+
   nav.modes{
     display:flex; gap: 6px; background: var(--panel); border: 1px solid var(--panel-line);
     border-radius: 14px; padding: 5px; margin-bottom: 22px; width: fit-content; flex-wrap: wrap;
@@ -69,7 +78,7 @@
 
   .layout{ display:grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
   .layout.wide-panel{ grid-template-columns: 420px 1fr; }
-  @media (max-width: 760px){ .layout{ grid-template-columns: 1fr; } }
+  @media (max-width: 760px){ .layout, .layout.wide-panel{ grid-template-columns: 1fr; } }
 
   .panel{ background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--radius-panel); padding: 20px; }
   .panel h2{ font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); margin: 0; font-weight: 500; }
@@ -206,16 +215,20 @@
     <div class="brand">
       <span class="fork">🎵</span>
       <h1>Камертон</h1>
-      <span class="tag">тренування слуху · безкоштовно</span>
+      <span class="tag" id="brandTag">тренування слуху</span>
     </div>
     <div class="score">
-      <span>вірно: <b id="scoreCorrect">0</b>/<span id="scoreTotal">0</span></span>
-      <span>серія: <b id="scoreStreak">0</b></span>
+      <span><span id="scoreCorrectLabel">вірно:</span> <b id="scoreCorrect">0</b>/<span id="scoreTotal">0</span></span>
+      <span><span id="scoreStreakLabel">серія:</span> <b id="scoreStreak">0</b></span>
       <button id="resetScore" type="button">скинути рахунок</button>
+      <div class="lang-switch" id="langSwitch">
+        <button type="button" class="lang-btn active" data-lang="ua">УКР</button>
+        <button type="button" class="lang-btn" data-lang="en">ENG</button>
+      </div>
     </div>
   </header>
 
-  <nav class="modes">
+  <nav class="modes" id="navModes">
     <button class="active" data-mode="intervals">Інтервали</button>
     <button data-mode="triads">Тризвуки</button>
     <button data-mode="timbre">Тембри</button>
@@ -248,7 +261,7 @@
     </div>
   </div>
 
-  <footer>Звук синтезується прямо у вашому браузері (Web Audio API) — нічого не завантажується і нічого не коштує.</footer>
+  <footer id="footerText">Звук синтезується прямо у вашому браузері (Web Audio API) — нічого не завантажується і нічого не коштує.</footer>
 </div>
 
 <script>
@@ -299,16 +312,16 @@
   // ---------- WebAudioFont (real instrument samples) ----------
   const SOUNDS_BASE = 'https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/';
   const INSTRUMENTS = [
-    {code:'piano1',     label:'Фортепіано (концертне)',  file:'0000_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0000_FluidR3_GM_sf2_file.js'},
-    {code:'piano2',     label:'Фортепіано (тембр 2)',    file:'0000_GeneralUserGS_sf2_file',  url: SOUNDS_BASE + '0000_GeneralUserGS_sf2_file.js'},
-    {code:'harpsichord',label:'Клавесин',                 file:'0060_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0060_FluidR3_GM_sf2_file.js'},
-    {code:'epiano1',    label:'Електропіано (тембр 1)',   file:'0040_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0040_FluidR3_GM_sf2_file.js'},
-    {code:'epiano2',    label:'Електропіано (тембр 2)',   file:'0050_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0050_FluidR3_GM_sf2_file.js'},
-    {code:'guitar',     label:'Гітара',                   file:'0240_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0240_FluidR3_GM_sf2_file.js'},
-    {code:'bass',       label:'Бас-гітара',               file:'0330_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0330_FluidR3_GM_sf2_file.js'},
-    {code:'violin',     label:'Скрипка',                  file:'0400_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0400_FluidR3_GM_sf2_file.js'},
-    {code:'flute',      label:'Флейта',                   file:'0730_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0730_FluidR3_GM_sf2_file.js'},
-    {code:'organ',      label:'Орган',                    file:'0190_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0190_FluidR3_GM_sf2_file.js'}
+    {code:'piano1',     label:'Фортепіано (концертне)',  en:'Piano (concert)',           file:'0000_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0000_FluidR3_GM_sf2_file.js'},
+    {code:'piano2',     label:'Фортепіано (тембр 2)',    en:'Piano (timbre 2)',          file:'0000_GeneralUserGS_sf2_file',  url: SOUNDS_BASE + '0000_GeneralUserGS_sf2_file.js'},
+    {code:'harpsichord',label:'Клавесин',                 en:'Harpsichord',               file:'0060_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0060_FluidR3_GM_sf2_file.js'},
+    {code:'epiano1',    label:'Електропіано (тембр 1)',   en:'Electric piano (timbre 1)', file:'0040_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0040_FluidR3_GM_sf2_file.js'},
+    {code:'epiano2',    label:'Електропіано (тембр 2)',   en:'Electric piano (timbre 2)', file:'0050_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0050_FluidR3_GM_sf2_file.js'},
+    {code:'guitar',     label:'Гітара',                   en:'Guitar',                    file:'0240_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0240_FluidR3_GM_sf2_file.js'},
+    {code:'bass',       label:'Бас-гітара',               en:'Bass guitar',               file:'0330_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0330_FluidR3_GM_sf2_file.js'},
+    {code:'violin',     label:'Скрипка',                  en:'Violin',                    file:'0400_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0400_FluidR3_GM_sf2_file.js'},
+    {code:'flute',      label:'Флейта',                   en:'Flute',                     file:'0730_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0730_FluidR3_GM_sf2_file.js'},
+    {code:'organ',      label:'Орган',                    en:'Organ',                     file:'0190_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0190_FluidR3_GM_sf2_file.js'}
   ];
 
   let wafPlayer = null;
@@ -321,11 +334,16 @@
   const loadQueue = [];
   let loadingInProgress = false;
   let currentlyLoadingCode = null;
+  let stagePendingInstrument = null; // instrument code shown as "loading" on the main stage, if any
+  // True only if the person actually pressed Play and we had to tell them to wait
+  // for the sample. Without this, the page would start playing on its own the
+  // moment the default instrument finished downloading.
+  let userWaitingForInstrument = false;
 
   function instrumentStatusText(code){
-    if(loadedInstruments[code]) return 'готово';
-    if(currentlyLoadingCode === code || loadQueue.indexOf(code) !== -1) return 'завантажується…';
-    return 'не завантажено';
+    if(loadedInstruments[code]) return T('statusReady');
+    if(currentlyLoadingCode === code || loadQueue.indexOf(code) !== -1) return T('statusLoading');
+    return T('statusNotLoaded');
   }
 
   function updateLoadStatus(code){
@@ -333,6 +351,25 @@
     if(!el) return;
     el.textContent = instrumentStatusText(code);
     el.classList.toggle('ready', !!loadedInstruments[code]);
+  }
+
+  // Called once an instrument finishes loading. If the person is sitting on
+  // "Intervals"/"Triads" waiting for it (no round has started yet, because
+  // the sample wasn't ready), automatically retry instead of making them
+  // click Play a second time - this matters most on mobile, where the first
+  // real-instrument download can take a while.
+  function notifyInstrumentReady(code){
+    updateLoadStatus(code);
+    if(stagePendingInstrument === code){
+      stagePendingInstrument = null;
+      if(!state.current){ seriesProgress.textContent = ''; }
+    }
+    const waitingOnThisTab = userWaitingForInstrument
+      && (state.mode === 'intervals' || state.mode === 'triads')
+      && state.soundEngine === 'library'
+      && !state.current
+      && state.enabled.instruments.has(code);
+    if(waitingOnThisTab){ startRound(); }
   }
 
   function processLoadQueue(){
@@ -352,7 +389,7 @@
     wp.loader.waitLoad(function(){
       loadedInstruments[code] = window[varName];
       loadingInProgress = false;
-      updateLoadStatus(code);
+      notifyInstrumentReady(code);
       processLoadQueue();
     });
   }
@@ -396,49 +433,49 @@
 
   // ---------- data ----------
   const INTERVALS = [
-    {code:'m2', semis:1,  label:'мала секунда'},
-    {code:'M2', semis:2,  label:'велика секунда'},
-    {code:'m3', semis:3,  label:'мала терція'},
-    {code:'M3', semis:4,  label:'велика терція'},
-    {code:'P4', semis:5,  label:'чиста кварта'},
-    {code:'TT', semis:6,  label:'тритон'},
-    {code:'P5', semis:7,  label:'чиста квінта'},
-    {code:'m6', semis:8,  label:'мала секста'},
-    {code:'M6', semis:9,  label:'велика секста'},
-    {code:'m7', semis:10, label:'мала септима'},
-    {code:'M7', semis:11, label:'велика септима'},
-    {code:'P8', semis:12, label:'октава'}
+    {code:'m2', semis:1,  label:'мала секунда', en:'minor second'},
+    {code:'M2', semis:2,  label:'велика секунда', en:'major second'},
+    {code:'m3', semis:3,  label:'мала терція', en:'minor third'},
+    {code:'M3', semis:4,  label:'велика терція', en:'major third'},
+    {code:'P4', semis:5,  label:'чиста кварта', en:'perfect fourth'},
+    {code:'TT', semis:6,  label:'тритон', en:'tritone'},
+    {code:'P5', semis:7,  label:'чиста квінта', en:'perfect fifth'},
+    {code:'m6', semis:8,  label:'мала секста', en:'minor sixth'},
+    {code:'M6', semis:9,  label:'велика секста', en:'major sixth'},
+    {code:'m7', semis:10, label:'мала септима', en:'minor seventh'},
+    {code:'M7', semis:11, label:'велика септима', en:'major seventh'},
+    {code:'P8', semis:12, label:'октава', en:'octave'}
   ];
 
   const DIRECTIONS = [
-    {code:'up', label:'висхідні'},
-    {code:'down', label:'низхідні'},
-    {code:'together', label:'одночасно'}
+    {code:'up', label:'висхідні', en:'ascending'},
+    {code:'down', label:'низхідні', en:'descending'},
+    {code:'together', label:'одночасно', en:'simultaneously'}
   ];
 
   const TRIADS = [
-    {code:'maj', semis:[0,4,7], label:'мажорний'},
-    {code:'min', semis:[0,3,7], label:'мінорний'},
-    {code:'dim', semis:[0,3,6], label:'зменшений'},
-    {code:'aug', semis:[0,4,8], label:'збільшений'}
+    {code:'maj', semis:[0,4,7], label:'мажорний', en:'major'},
+    {code:'min', semis:[0,3,7], label:'мінорний', en:'minor'},
+    {code:'dim', semis:[0,3,6], label:'зменшений', en:'diminished'},
+    {code:'aug', semis:[0,4,8], label:'збільшений', en:'augmented'}
   ];
 
   const TRIAD_INVERSIONS = [
-    {code:'root', label:'основний вигляд'},
-    {code:'inv1', label:'перше обернення'},
-    {code:'inv2', label:'друге обернення'}
+    {code:'root', label:'основний вигляд', en:'root position'},
+    {code:'inv1', label:'перше обернення', en:'first inversion'},
+    {code:'inv2', label:'друге обернення', en:'second inversion'}
   ];
 
   const CHORD_STYLES = [
-    {code:'block', label:'акорд'},
-    {code:'arp-up', label:'арпеджіо висхідне'},
-    {code:'arp-down', label:'арпеджіо низхідне'}
+    {code:'block', label:'акорд', en:'chord'},
+    {code:'arp-up', label:'арпеджіо висхідне', en:'arpeggio ascending'},
+    {code:'arp-down', label:'арпеджіо низхідне', en:'arpeggio descending'}
   ];
 
   const TIMBRES = [
-    {code:'triangle', wave:'triangle', label:'трикутна'},
-    {code:'square',   wave:'square',   label:'прямокутна'},
-    {code:'sawtooth', wave:'sawtooth', label:'пилкоподібна'}
+    {code:'triangle', wave:'triangle', label:'трикутна', en:'triangle'},
+    {code:'square',   wave:'square',   label:'прямокутна', en:'square'},
+    {code:'sawtooth', wave:'sawtooth', label:'пилкоподібна', en:'sawtooth'}
   ];
 
   function chordVoicing(semis, invCode){
@@ -465,9 +502,108 @@
   const DEFAULT_SOUND_ENGINE = 'library';
   const DEFAULT_INSTRUMENT_CODE = 'piano1';
 
+  // ---------- i18n ----------
+  // Every static (non-data-array) piece of UI text lives here, keyed by a
+  // stable id. Data-array items (INTERVALS, INSTRUMENTS, etc.) carry their
+  // own label/en fields instead - see L() below.
+  const UI = {
+    scoreCorrectLabel:   { ua:'вірно:', en:'correct:' },
+    scoreStreakLabel:    { ua:'серія:', en:'streak:' },
+    resetScoreBtn:       { ua:'скинути рахунок', en:'reset score' },
+    brandTag:            { ua:'тренування слуху', en:'ear training' },
+    navIntervals:        { ua:'Інтервали', en:'Intervals' },
+    navTriads:           { ua:'Тризвуки', en:'Triads' },
+    navTimbre:           { ua:'Тембри', en:'Timbres' },
+    navSound:            { ua:'Звук', en:'Sound' },
+    playBtnTitle:        { ua:'Відтворити', en:'Play' },
+    replayBtn:           { ua:'відтворити ще раз', en:'play again' },
+    resetSeriesBtnTitle: { ua:'Почати серію з початку', en:'Restart the series' },
+    resetSeriesBtn:      { ua:'скинути серію', en:'reset series' },
+    defaultPrompt:       { ua:'Натисніть кнопку, щоб почути перший приклад', en:'Press the button to hear the first example' },
+    playPrompt:          { ua:'Натисніть ▶, щоб почути приклад', en:'Press ▶ to hear the example' },
+    nextBtn:             { ua:'Наступне →', en:'Next →' },
+    showSummaryBtn:      { ua:'Показати підсумок →', en:'Show summary →' },
+    soundInfoText:       { ua:'Ця вкладка налаштовує, яким звуком гратимуть приклади в розділах «Інтервали» та «Тризвуки» — синтезованими хвилями або семплами реальних інструментів. Тренуватися можна в інших вкладках.',
+                            en:'This tab sets which sound plays the examples in the "Intervals" and "Triads" sections — synthesized waves or real instrument samples. You can practice in the other tabs.' },
+    footerText:          { ua:'Звук синтезується прямо у вашому браузері (Web Audio API) — нічого не завантажується і нічого не коштує.',
+                            en:'Sound is generated right in your browser (Web Audio API) — nothing to install, nothing to pay.' },
+
+    seriesLenTitle:      { ua:'Кількість прикладів у серії', en:'Examples per series' },
+    selectAllBtn:        { ua:'обрати всі', en:'select all' },
+    clearAllBtn:         { ua:'очистити всі', en:'clear all' },
+    intervalsTitle:      { ua:'Які інтервали тренувати', en:'Which intervals to train' },
+    playbackStyleTitle:  { ua:'Спосіб відтворення', en:'Playback style' },
+    triadsTitle:         { ua:'Які тризвуки тренувати', en:'Which triads to train' },
+    inversionsTitle:     { ua:'Обернення тризвуків', en:'Chord inversions' },
+    timbresTitle:        { ua:'Які тембри тренувати', en:'Which timbres to train' },
+    timbreHint:          { ua:'Тут "тембр" — це форма хвилі синтезатора, а не звук реального інструмента.',
+                            en:'Here "timbre" means the synthesizer waveform, not a real instrument sound.' },
+    soundSourceTitle:    { ua:'Джерело звуку', en:'Sound source' },
+    engineLibrary:       { ua:'Реальні інструменти (бібліотека)', en:'Real instruments (library)' },
+    engineSynth:         { ua:'Синтезовані хвилі', en:'Synthesized waves' },
+    waveformsTitle:      { ua:'Тембри (форми хвилі)', en:'Timbres (waveforms)' },
+    waveformsHint:       { ua:'Цим звуком гратимуть приклади в "Інтервалах" і "Тризвуках".',
+                            en:'This sound will be used to play examples in "Intervals" and "Triads".' },
+    instrumentsTitle:    { ua:'Інструменти', en:'Instruments' },
+    instrumentsHint:     { ua:'Ноти завантажуються з відкритої бібліотеки WebAudioFont (вільна ліцензія, можна використовувати безкоштовно, зокрема для навчання). Потрібне інтернет-з’єднання під час завантаження.',
+                            en:'Notes are loaded from the open WebAudioFont library (free license, usable for free, including for teaching). Requires an internet connection while loading.' },
+    previewBtnTitle:     { ua:'Прослухати (висхідний мажорний тризвук)', en:'Preview (ascending major triad)' },
+    loadingStageMsg:     { ua:'Завантажується тембр…', en:'Loading the sound…' },
+
+    statusReady:         { ua:'готово', en:'ready' },
+    statusLoading:       { ua:'завантажується…', en:'loading…' },
+    statusNotLoaded:     { ua:'не завантажено', en:'not loaded' },
+
+    errPickAny:          { ua:'Оберіть хоча б один варіант у налаштуваннях зліва.', en:'Select at least one option in the settings on the left.' },
+    errPickStyle:        { ua:'Оберіть хоча б один спосіб відтворення у налаштуваннях зліва.', en:'Select at least one playback style in the settings on the left.' },
+    errPickInversion:    { ua:'Оберіть хоча б одне обернення у налаштуваннях зліва.', en:'Select at least one inversion in the settings on the left.' },
+    errPickTimbre:       { ua:'Оберіть хоча б один тембр звучання у вкладці «Звук».', en:'Select at least one timbre in the "Sound" tab.' },
+    errWaitInstruments:  { ua:'Зачекайте, поки завантажаться обрані інструменти (вкладка «Звук»), і спробуйте ще раз.',
+                            en:'Wait for the selected instruments to finish loading (Sound tab), then try again.' },
+    errPickInstrument:   { ua:'Оберіть хоча б один інструмент у вкладці «Звук».', en:'Select at least one instrument in the "Sound" tab.' },
+
+    feedbackCorrectPrefix: { ua:'Правильно — ', en:'Correct — ' },
+    feedbackWrongPrefix:   { ua:'Не зовсім. Правильна відповідь: ', en:'Not quite. Correct answer: ' },
+
+    exampleWord:         { ua:'Приклад', en:'Example' },
+    ofWord:               { ua:'з', en:'of' },
+    correctWord:          { ua:'правильно', en:'correct' },
+    seriesCompleteWord:   { ua:'Серію завершено —', en:'Series complete —' },
+
+    summaryTitle:         { ua:'Підсумок серії', en:'Series summary' },
+    summaryYourAnswer:    { ua:'ваша відповідь: ', en:'your answer: ' },
+    lineCorrectWord:      { ua:'вірно', en:'correct' },
+    lineIncorrectWord:    { ua:'невірно', en:'incorrect' },
+    badgeCorrect:         { ua:'✓ вірно', en:'✓ correct' },
+    badgeWrong:           { ua:'✗ невірно', en:'✗ incorrect' },
+    saveResultBtn:        { ua:'Зберегти результат', en:'Save result' },
+    copyResultBtn:        { ua:'Скопіювати результат', en:'Copy result' },
+    newSeriesBtn:         { ua:'Нова серія →', en:'New series →' },
+    copiedMsg:            { ua:'Скопійовано!', en:'Copied!' },
+    summaryHeader:        { ua:'Камертон — підсумок серії', en:'Kamerton — series summary' },
+    summarySection:       { ua:'Розділ: ', en:'Section: ' },
+    summaryDate:          { ua:'Дата: ', en:'Date: ' },
+    summaryResult:        { ua:'Результат: ', en:'Result: ' }
+  };
+
+  // T(key): current-language text for a static UI string.
+  function T(key){
+    const entry = UI[key];
+    return entry ? entry[state.lang] : key;
+  }
+
+  // L(item): current-language label for a data-array item (interval, triad,
+  // instrument, etc.) - these carry their own {label (ua), en} fields.
+  function L(item){
+    if(!item) return '';
+    return state.lang === 'en' ? (item.en || item.label) : item.label;
+  }
+
+
   // ---------- state ----------
   const state = {
     mode: 'intervals',
+    lang: 'ua',
     soundEngine: DEFAULT_SOUND_ENGINE,
     enabled: {
       intervals: new Set(INTERVALS.map(i=>i.code)),
@@ -504,6 +640,13 @@
   const summaryPanel = document.getElementById('summaryPanel');
   const soundInfo = document.getElementById('soundInfo');
   const layoutGrid = document.getElementById('layoutGrid');
+  const brandTag = document.getElementById('brandTag');
+  const scoreCorrectLabel = document.getElementById('scoreCorrectLabel');
+  const scoreStreakLabel = document.getElementById('scoreStreakLabel');
+  const resetScoreBtn = document.getElementById('resetScore');
+  const footerTextEl = document.getElementById('footerText');
+  const navModes = document.getElementById('navModes');
+  const langSwitch = document.getElementById('langSwitch');
 
   function renderScore(){
     scoreCorrect.textContent = state.score.correct;
@@ -511,7 +654,73 @@
     scoreStreak.textContent = state.score.streak;
   }
 
-  document.getElementById('resetScore').addEventListener('click', ()=>{
+  function applyStaticTexts(){
+    document.title = state.lang === 'en' ? 'Kamerton — Ear Training' : 'Камертон — тренування слуху';
+    document.documentElement.lang = state.lang === 'en' ? 'en' : 'uk';
+    brandTag.textContent = T('brandTag');
+    scoreCorrectLabel.textContent = T('scoreCorrectLabel');
+    scoreStreakLabel.textContent = T('scoreStreakLabel');
+    resetScoreBtn.textContent = T('resetScoreBtn');
+    footerTextEl.textContent = T('footerText');
+    soundInfo.textContent = T('soundInfoText');
+    playBtn.title = T('playBtnTitle');
+    replayBtn.textContent = T('replayBtn');
+    resetSeriesBtn.title = T('resetSeriesBtnTitle');
+    resetSeriesBtn.textContent = T('resetSeriesBtn');
+
+    const navKeyByMode = { intervals:'navIntervals', triads:'navTriads', timbre:'navTimbre', sound:'navSound' };
+    navModes.querySelectorAll('button[data-mode]').forEach(btn=>{
+      btn.textContent = T(navKeyByMode[btn.dataset.mode]);
+    });
+
+    langSwitch.querySelectorAll('.lang-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.lang === state.lang);
+    });
+
+    // The default/idle prompt should only be overwritten if no round is
+    // currently blocked on a validation message or mid-play - simplest safe
+    // approach: only refresh it when there's no active round yet.
+    if(!state.current && summaryPanel.style.display === 'none'){
+      promptEl.textContent = T('defaultPrompt');
+    }
+    if(stagePendingInstrument){
+      seriesProgress.textContent = T('loadingStageMsg');
+    }
+  }
+
+  function relabelActiveRound(){
+    if(!state.current) return;
+    answersEl.querySelectorAll('.ans-btn').forEach(btn=>{
+      const item = state.current.pool.find(p => p.code === btn.dataset.code);
+      if(item) btn.textContent = L(item);
+    });
+    if(state.answered){
+      const correctCode = state.current.code;
+      const wrongBtn = answersEl.querySelector('.ans-btn.wrong');
+      if(wrongBtn){
+        feedbackEl.textContent = T('feedbackWrongPrefix') + labelFor(state.mode, correctCode) + '.';
+      } else if(answersEl.querySelector('.ans-btn.correct')){
+        feedbackEl.textContent = T('feedbackCorrectPrefix') + labelFor(state.mode, correctCode) + '.';
+      }
+      nextBtn.textContent = state.seriesIndex >= state.seriesLength ? T('showSummaryBtn') : T('nextBtn');
+    }
+  }
+
+  function applyLanguage(lang){
+    state.lang = lang === 'en' ? 'en' : 'ua';
+    applyStaticTexts();
+    renderSettings();
+    relabelActiveRound();
+    if(summaryPanel.style.display !== 'none'){
+      renderSummaryPanel();
+    }
+  }
+
+  langSwitch.querySelectorAll('.lang-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> applyLanguage(btn.dataset.lang));
+  });
+
+  resetScoreBtn.addEventListener('click', ()=>{
     state.score = { correct:0, total:0, streak:0 };
     renderScore();
   });
@@ -532,46 +741,46 @@
     }
 
     if(state.mode === 'intervals'){
-      settingsPanel.appendChild(buildChecklist('Які інтервали тренувати', INTERVALS, state.enabled.intervals, {selectAll:true}));
+      settingsPanel.appendChild(buildChecklist(T('intervalsTitle'), INTERVALS, state.enabled.intervals, {selectAll:true}));
       settingsPanel.appendChild(divider());
-      settingsPanel.appendChild(buildChecklist('Спосіб відтворення', DIRECTIONS, state.enabled.direction));
+      settingsPanel.appendChild(buildChecklist(T('playbackStyleTitle'), DIRECTIONS, state.enabled.direction));
     }
 
     if(state.mode === 'triads'){
-      settingsPanel.appendChild(buildChecklist('Які тризвуки тренувати', TRIADS, state.enabled.triads));
+      settingsPanel.appendChild(buildChecklist(T('triadsTitle'), TRIADS, state.enabled.triads));
       settingsPanel.appendChild(divider());
-      settingsPanel.appendChild(buildChecklist('Обернення тризвуків', TRIAD_INVERSIONS, state.enabled.inversions));
+      settingsPanel.appendChild(buildChecklist(T('inversionsTitle'), TRIAD_INVERSIONS, state.enabled.inversions));
       settingsPanel.appendChild(divider());
-      settingsPanel.appendChild(buildChecklist('Спосіб відтворення', CHORD_STYLES, state.enabled.chordStyle));
+      settingsPanel.appendChild(buildChecklist(T('playbackStyleTitle'), CHORD_STYLES, state.enabled.chordStyle));
     }
 
     if(state.mode === 'timbre'){
-      settingsPanel.appendChild(buildChecklist('Які тембри тренувати', TIMBRES, state.enabled.timbre));
+      settingsPanel.appendChild(buildChecklist(T('timbresTitle'), TIMBRES, state.enabled.timbre));
       const p = document.createElement('p');
       p.className = 'hint';
       p.style.marginTop = '12px';
-      p.textContent = 'Тут "тембр" — це форма хвилі синтезатора, а не звук реального інструмента.';
+      p.textContent = T('timbreHint');
       settingsPanel.appendChild(p);
     }
 
     if(state.mode === 'sound'){
-      settingsPanel.appendChild(buildRadio('Джерело звуку', [
-        {v:'library', l:'Реальні інструменти (бібліотека)'},
-        {v:'synth', l:'Синтезовані хвилі'}
+      settingsPanel.appendChild(buildRadio(T('soundSourceTitle'), [
+        {v:'library', l:'Реальні інструменти (бібліотека)', en:'Real instruments (library)'},
+        {v:'synth', l:'Синтезовані хвилі', en:'Synthesized waves'}
       ], state.soundEngine, v=>{ state.soundEngine = v; renderSettings(); }));
       settingsPanel.appendChild(divider());
 
       if(state.soundEngine === 'synth'){
-        settingsPanel.appendChild(buildChecklist('Тембри (форми хвилі)', TIMBRES, state.enabled.waveforms, {
+        settingsPanel.appendChild(buildChecklist(T('waveformsTitle'), TIMBRES, state.enabled.waveforms, {
           onPreview: (item) => previewSound('synth', item.wave)
         }));
         const p = document.createElement('p');
         p.className = 'hint';
         p.style.marginTop = '12px';
-        p.textContent = 'Цим звуком гратимуть приклади в "Інтервалах" і "Тризвуках".';
+        p.textContent = T('waveformsHint');
         settingsPanel.appendChild(p);
       } else {
-        settingsPanel.appendChild(buildChecklist('Інструменти', INSTRUMENTS, state.enabled.instruments, {
+        settingsPanel.appendChild(buildChecklist(T('instrumentsTitle'), INSTRUMENTS, state.enabled.instruments, {
           selectAll: true,
           statusFn: instrumentStatusText,
           onCheck: (code, checked) => { if(checked) queueLoadInstrument(code); },
@@ -581,7 +790,7 @@
         const p = document.createElement('p');
         p.className = 'hint';
         p.style.marginTop = '12px';
-        p.textContent = 'Ноти завантажуються з відкритої бібліотеки WebAudioFont (вільна ліцензія, можна використовувати безкоштовно, зокрема для навчання). Потрібне інтернет-з’єднання під час завантаження.';
+        p.textContent = T('instrumentsHint');
         settingsPanel.appendChild(p);
       }
     }
@@ -591,7 +800,7 @@
     const box = document.createElement('div');
     const h = document.createElement('h2');
     h.style.marginBottom = '14px';
-    h.textContent = 'Кількість прикладів у серії';
+    h.textContent = T('seriesLenTitle');
     box.appendChild(h);
 
     const select = document.createElement('select');
@@ -627,7 +836,7 @@
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'mini-btn';
-      allBtn.textContent = 'обрати всі';
+      allBtn.textContent = T('selectAllBtn');
       allBtn.addEventListener('click', ()=>{
         items.forEach(it => enabledSet.add(it.code));
         renderSettings();
@@ -635,7 +844,7 @@
       const noneBtn = document.createElement('button');
       noneBtn.type = 'button';
       noneBtn.className = 'mini-btn';
-      noneBtn.textContent = 'очистити всі';
+      noneBtn.textContent = T('clearAllBtn');
       noneBtn.addEventListener('click', ()=>{
         enabledSet.clear();
         renderSettings();
@@ -659,7 +868,7 @@
         if(opts.onCheck) opts.onCheck(item.code, cb.checked);
       });
       const span = document.createElement('span');
-      span.textContent = item.label;
+      span.textContent = L(item);
       row.appendChild(cb);
       row.appendChild(span);
       if(opts.statusFn){
@@ -680,7 +889,7 @@
         preview.type = 'button';
         preview.className = 'preview-btn';
         preview.textContent = '▶';
-        preview.title = 'Прослухати (висхідний мажорний тризвук)';
+        preview.title = T('previewBtnTitle');
         preview.addEventListener('click', (e)=>{
           e.preventDefault();
           e.stopPropagation();
@@ -710,7 +919,7 @@
       input.checked = opt.v === current;
       input.addEventListener('change', ()=> onChange(opt.v));
       label.appendChild(input);
-      label.appendChild(document.createTextNode(opt.l));
+      label.appendChild(document.createTextNode(state.lang === 'en' ? (opt.en || opt.l) : opt.l));
       wrap.appendChild(label);
     });
     box.appendChild(wrap);
@@ -736,16 +945,15 @@
     if(state.soundEngine === 'synth'){
       const wavePool = TIMBRES.filter(t => state.enabled.waveforms.has(t.code));
       if(wavePool.length === 0){
-        return { error: 'Оберіть хоча б один тембр звучання у вкладці «Звук».' };
+        return { error: T('errPickTimbre') };
       }
       return { soundPick: { kind:'synth', wave: pick(wavePool).wave } };
     }
     const instrPool = INSTRUMENTS.filter(i => state.enabled.instruments.has(i.code) && loadedInstruments[i.code]);
     if(instrPool.length === 0){
       const anyEnabled = INSTRUMENTS.some(i => state.enabled.instruments.has(i.code));
-      return { error: anyEnabled
-        ? 'Зачекайте, поки завантажаться обрані інструменти (вкладка «Звук»), і спробуйте ще раз.'
-        : 'Оберіть хоча б один інструмент у вкладці «Звук».' };
+      userWaitingForInstrument = anyEnabled;
+      return { error: anyEnabled ? T('errWaitInstruments') : T('errPickInstrument') };
     }
     return { soundPick: { kind:'library', code: pick(instrPool).code } };
   }
@@ -753,7 +961,7 @@
   function buildRound(){
     const pool = enabledList();
     if(pool.length === 0){
-      promptEl.textContent = 'Оберіть хоча б один варіант у налаштуваннях зліва.';
+      promptEl.textContent = T('errPickAny');
       answersEl.innerHTML = '';
       return null;
     }
@@ -761,7 +969,7 @@
     if(state.mode === 'intervals'){
       const dirPool = DIRECTIONS.filter(d => state.enabled.direction.has(d.code));
       if(dirPool.length === 0){
-        promptEl.textContent = 'Оберіть хоча б один напрямок відтворення у налаштуваннях зліва.';
+        promptEl.textContent = T('errPickStyle');
         answersEl.innerHTML = '';
         return null;
       }
@@ -784,13 +992,13 @@
     if(state.mode === 'triads'){
       const invPool = TRIAD_INVERSIONS.filter(iv => state.enabled.inversions.has(iv.code));
       if(invPool.length === 0){
-        promptEl.textContent = 'Оберіть хоча б одне обернення у налаштуваннях зліва.';
+        promptEl.textContent = T('errPickInversion');
         answersEl.innerHTML = '';
         return null;
       }
       const stylePool = CHORD_STYLES.filter(s => state.enabled.chordStyle.has(s.code));
       if(stylePool.length === 0){
-        promptEl.textContent = 'Оберіть хоча б один спосіб відтворення у налаштуваннях зліва.';
+        promptEl.textContent = T('errPickStyle');
         answersEl.innerHTML = '';
         return null;
       }
@@ -822,7 +1030,7 @@
   function labelFor(mode, code){
     const src = mode === 'intervals' ? INTERVALS : mode === 'triads' ? TRIADS : TIMBRES;
     const found = src.find(x => x.code === code);
-    return found ? found.label : code;
+    return found ? L(found) : code;
   }
 
   function renderAnswers(round){
@@ -830,7 +1038,7 @@
     round.pool.forEach(item=>{
       const btn = document.createElement('button');
       btn.className = 'ans-btn';
-      btn.textContent = item.label;
+      btn.textContent = L(item);
       btn.dataset.code = item.code;
       btn.disabled = true;
       btn.addEventListener('click', ()=> handleAnswer(item.code, btn));
@@ -862,15 +1070,16 @@
     feedbackEl.textContent = '';
     feedbackEl.className = 'feedback';
     nextBtn.classList.remove('show');
-    nextBtn.textContent = 'Наступне →';
+    nextBtn.textContent = T('nextBtn');
     replayBtn.disabled = true;
 
     const round = buildRound();
     if(!round){ state.current = null; return; }
+    userWaitingForInstrument = false;
     state.current = round;
     renderAnswers(round);
-    seriesProgress.textContent = 'Приклад ' + (state.seriesIndex + 1) + ' з ' + state.seriesLength;
-    promptEl.textContent = 'Натисніть ▶, щоб почути приклад';
+    seriesProgress.textContent = T('exampleWord') + ' ' + (state.seriesIndex + 1) + ' ' + T('ofWord') + ' ' + state.seriesLength;
+    promptEl.textContent = T('playPrompt');
     playCurrent();
   }
 
@@ -885,12 +1094,12 @@
       state.score.correct += 1;
       state.score.streak += 1;
       btn.classList.add('correct');
-      feedbackEl.textContent = 'Правильно — ' + labelFor(state.mode, correctCode) + '.';
+      feedbackEl.textContent = T('feedbackCorrectPrefix') + labelFor(state.mode, correctCode) + '.';
       feedbackEl.className = 'feedback good';
     } else {
       state.score.streak = 0;
       btn.classList.add('wrong');
-      feedbackEl.textContent = 'Не зовсім. Правильна відповідь: ' + labelFor(state.mode, correctCode) + '.';
+      feedbackEl.textContent = T('feedbackWrongPrefix') + labelFor(state.mode, correctCode) + '.';
       feedbackEl.className = 'feedback bad';
       const correctBtn = answersEl.querySelector('[data-code="'+correctCode+'"]');
       if(correctBtn) correctBtn.classList.add('reveal');
@@ -905,25 +1114,25 @@
     state.seriesIndex += 1;
 
     answersEl.querySelectorAll('.ans-btn').forEach(b => b.disabled = true);
-    nextBtn.textContent = state.seriesIndex >= state.seriesLength ? 'Показати підсумок →' : 'Наступне →';
+    nextBtn.textContent = state.seriesIndex >= state.seriesLength ? T('showSummaryBtn') : T('nextBtn');
     nextBtn.classList.add('show');
   }
 
   function modeLabel(){
-    return state.mode === 'intervals' ? 'Інтервали' : state.mode === 'triads' ? 'Тризвуки' : 'Тембри';
+    return state.mode === 'intervals' ? T('navIntervals') : state.mode === 'triads' ? T('navTriads') : T('navTimbre');
   }
 
   function buildSummaryText(){
     const correctCount = state.seriesLog.filter(l=>l.correct).length;
     const lines = [];
-    lines.push('Камертон — підсумок серії');
-    lines.push('Розділ: ' + modeLabel());
-    lines.push('Дата: ' + new Date().toLocaleString('uk-UA'));
-    lines.push('Результат: ' + correctCount + ' з ' + state.seriesLog.length + ' правильно');
+    lines.push(T('summaryHeader'));
+    lines.push(T('summarySection') + modeLabel());
+    lines.push(T('summaryDate') + new Date().toLocaleString(state.lang === 'en' ? 'en-US' : 'uk-UA'));
+    lines.push(T('summaryResult') + correctCount + ' ' + T('ofWord') + ' ' + state.seriesLog.length + ' ' + T('correctWord'));
     lines.push('');
     state.seriesLog.forEach((entry, i)=>{
-      let line = (i+1) + '. ' + entry.targetLabel + ' — ' + (entry.correct ? 'вірно' : 'невірно');
-      if(!entry.correct) line += ' (ваша відповідь: ' + entry.userLabel + ')';
+      let line = (i+1) + '. ' + entry.targetLabel + ' — ' + (entry.correct ? T('lineCorrectWord') : T('lineIncorrectWord'));
+      if(!entry.correct) line += ' (' + T('summaryYourAnswer') + entry.userLabel + ')';
       lines.push(line);
     });
     return lines.join('\n');
@@ -957,7 +1166,7 @@
   function copySummary(msgEl){
     const text = buildSummaryText();
     const showCopied = ()=>{
-      msgEl.textContent = 'Скопійовано!';
+      msgEl.textContent = T('copiedMsg');
       setTimeout(()=>{ msgEl.textContent = ''; }, 2000);
     };
     if(navigator.clipboard && navigator.clipboard.writeText){
@@ -972,25 +1181,25 @@
   function renderSummaryPanel(){
     const correctCount = state.seriesLog.filter(l=>l.correct).length;
     let html = '';
-    html += '<div class="summary-head"><h2>Підсумок серії</h2><div class="summary-score">' + correctCount + ' / ' + state.seriesLog.length + ' правильно</div></div>';
+    html += '<div class="summary-head"><h2>' + escapeHtml(T('summaryTitle')) + '</h2><div class="summary-score">' + correctCount + ' / ' + state.seriesLog.length + ' ' + escapeHtml(T('correctWord')) + '</div></div>';
     html += '<div class="summary-list">';
     state.seriesLog.forEach((entry, i)=>{
       const badgeClass = entry.correct ? 'badge-correct' : 'badge-wrong';
-      const badgeText = entry.correct ? '✓ вірно' : '✗ невірно';
+      const badgeText = entry.correct ? T('badgeCorrect') : T('badgeWrong');
       html += '<div class="summary-row">' +
         '<span class="summary-idx">' + (i+1) + '.</span>' +
         '<span class="summary-target">' + escapeHtml(entry.targetLabel) + '</span>' +
         '<span class="' + badgeClass + '">' + badgeText + '</span>' +
-        (!entry.correct ? '<span class="summary-user">ваша відповідь: ' + escapeHtml(entry.userLabel) + '</span>' : '') +
+        (!entry.correct ? '<span class="summary-user">' + escapeHtml(T('summaryYourAnswer')) + escapeHtml(entry.userLabel) + '</span>' : '') +
         '</div>';
     });
     html += '</div>';
     html += '<div class="summary-actions">' +
-      '<button class="ghost-btn" id="saveSummaryBtn" type="button">Зберегти результат</button>' +
-      '<button class="ghost-btn" id="copySummaryBtn" type="button">Скопіювати результат</button>' +
+      '<button class="ghost-btn" id="saveSummaryBtn" type="button">' + escapeHtml(T('saveResultBtn')) + '</button>' +
+      '<button class="ghost-btn" id="copySummaryBtn" type="button">' + escapeHtml(T('copyResultBtn')) + '</button>' +
       '<span class="summary-msg" id="summaryMsg"></span>' +
       '</div>';
-    html += '<button class="next-btn show" id="newSeriesBtn" type="button">Нова серія →</button>';
+    html += '<button class="next-btn show" id="newSeriesBtn" type="button">' + escapeHtml(T('newSeriesBtn')) + '</button>';
     summaryPanel.innerHTML = html;
 
     document.getElementById('saveSummaryBtn').addEventListener('click', saveSummary);
@@ -1006,10 +1215,11 @@
     stageContent.style.display = 'none';
     summaryPanel.style.display = '';
     const correctCount = state.seriesLog.filter(l=>l.correct).length;
-    seriesProgress.textContent = 'Серію завершено — ' + correctCount + ' з ' + state.seriesLog.length + ' правильно';
+    seriesProgress.textContent = T('seriesCompleteWord') + ' ' + correctCount + ' ' + T('ofWord') + ' ' + state.seriesLog.length + ' ' + T('correctWord');
   }
 
   function resetSeries(){
+    userWaitingForInstrument = false;
     state.seriesIndex = 0;
     state.seriesLog = [];
     state.current = null;
@@ -1021,7 +1231,7 @@
     feedbackEl.className = 'feedback';
     nextBtn.classList.remove('show');
     replayBtn.disabled = true;
-    promptEl.textContent = 'Натисніть ▶, щоб почути приклад';
+    promptEl.textContent = T('playPrompt');
     seriesProgress.textContent = '';
   }
 
@@ -1058,11 +1268,21 @@
     });
   });
 
+  applyStaticTexts();
   renderSettings();
   renderScore();
   // Load the default real instrument(s) right away, so "Intervals"/"Triads"
-  // work immediately even if the person never opens the "Sound" tab.
+  // work immediately even if the person never opens the "Sound" tab. On a
+  // slow (e.g. mobile) connection this can take a moment, so surface it on
+  // the main stage too, not just the "Sound" tab's per-row status.
   state.enabled.instruments.forEach(code => queueLoadInstrument(code));
+  if(state.soundEngine === 'library'){
+    const stillLoading = Array.from(state.enabled.instruments).find(code => !loadedInstruments[code]);
+    if(stillLoading){
+      stagePendingInstrument = stillLoading;
+      seriesProgress.textContent = T('loadingStageMsg');
+    }
+  }
 
   if(typeof module !== 'undefined' && module.exports){
     module.exports = {
@@ -1071,7 +1291,9 @@
       chordVoicing, midiToFreq, intervalRootRange, pickIntervalRootMidi,
       SEQ_GAP_SYNTH, SEQ_DUR_SYNTH, SEQ_GAP_LIB, SEQ_DUR_LIB,
       ensureCtx, state,
-      loadedInstruments, ensureWafPlayer, playLibrarySequence, previewSound, playSynthSequence
+      loadedInstruments, ensureWafPlayer, playLibrarySequence, previewSound, playSynthSequence,
+      queueLoadInstrument, notifyInstrumentReady, startRound, resetSeries,
+      UI, T, L, applyLanguage, labelFor, modeLabel, buildSummaryText
     };
   }
 })();
