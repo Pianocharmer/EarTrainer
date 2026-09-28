@@ -537,6 +537,10 @@
     footerText:          { ua:'Якщо звук не відтворюється, переконайтеся, що пристрій не в беззвучному режимі, або оновіть сторінку.',
                             en:"If there is no sound, make sure your device is not in silent mode, or refresh the page." },
 
+    triadTrainModeTitle: { ua:'Режим тренування', en:'Training mode' },
+    triadModeTypeInv:    { ua:'тренувати тип тризвуку та обернення', en:'train chord type and inversion' },
+    triadModeTypeOnly:   { ua:'тренувати лише тип тризвуку', en:'train chord type only' },
+    summaryTimbre:       { ua:'тембр: ', en:'timbre: ' },
     seriesLenTitle:      { ua:'Кількість прикладів у серії', en:'Examples per series' },
     selectAllBtn:        { ua:'обрати всі', en:'select all' },
     clearAllBtn:         { ua:'очистити всі', en:'clear all' },
@@ -613,6 +617,7 @@
   const state = {
     mode: 'intervals',
     lang: 'ua',
+    triadAnswerMode: 'type_inv',   // 'type_inv' = answer with type + inversion, 'type_only' = type only
     soundEngine: DEFAULT_SOUND_ENGINE,
     enabled: {
       intervals: new Set(INTERVALS.map(i=>i.code)),
@@ -756,6 +761,11 @@
     }
 
     if(state.mode === 'triads'){
+      settingsPanel.appendChild(buildRadio(T('triadTrainModeTitle'), [
+        {v:'type_inv',  l:UI.triadModeTypeInv.ua,  en:UI.triadModeTypeInv.en},
+        {v:'type_only', l:UI.triadModeTypeOnly.ua, en:UI.triadModeTypeOnly.en}
+      ], state.triadAnswerMode, v => { state.triadAnswerMode = v; resetSeries(); }));
+      settingsPanel.appendChild(divider());
       settingsPanel.appendChild(buildChecklist(T('triadsTitle'), TRIADS, state.enabled.triads));
       settingsPanel.appendChild(divider());
       settingsPanel.appendChild(buildChecklist(T('inversionsTitle'), TRIAD_INVERSIONS, state.enabled.inversions));
@@ -944,9 +954,29 @@
   // ---------- round logic ----------
   function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
+  // Answer options for "chord type + inversion" training: every enabled chord
+  // type combined with every enabled inversion, e.g. "major, first inversion".
+  function triadAnswerCombos(){
+    const combos = [];
+    TRIADS.filter(t => state.enabled.triads.has(t.code)).forEach(tr => {
+      TRIAD_INVERSIONS.filter(iv => state.enabled.inversions.has(iv.code)).forEach(iv => {
+        combos.push({
+          code: tr.code + '|' + iv.code,
+          label: tr.label + ', ' + iv.label,
+          en: (tr.en || tr.label) + ', ' + (iv.en || iv.label),
+          triad: tr, inversion: iv
+        });
+      });
+    });
+    return combos;
+  }
+
   function enabledList(){
     if(state.mode === 'intervals') return INTERVALS.filter(i => state.enabled.intervals.has(i.code));
-    if(state.mode === 'triads') return TRIADS.filter(t => state.enabled.triads.has(t.code));
+    if(state.mode === 'triads'){
+      if(state.triadAnswerMode === 'type_inv') return triadAnswerCombos();
+      return TRIADS.filter(t => state.enabled.triads.has(t.code));
+    }
     if(state.mode === 'timbre') return TIMBRES.filter(t => state.enabled.timbre.has(t.code));
   }
 
@@ -968,6 +998,12 @@
   }
 
   function buildRound(){
+    if(state.mode === 'triads' && state.triadAnswerMode === 'type_inv'
+       && state.enabled.triads.size > 0 && state.enabled.inversions.size === 0){
+      promptEl.textContent = T('errPickInversion');
+      answersEl.innerHTML = '';
+      return null;
+    }
     const pool = enabledList();
     if(pool.length === 0){
       promptEl.textContent = T('errPickAny');
@@ -1017,8 +1053,10 @@
         answersEl.innerHTML = '';
         return null;
       }
-      const item = pick(pool);
-      const invItem = pick(invPool);
+      const chosen = pick(pool);
+      const isCombo = !!chosen.triad;          // "type + inversion" answer mode
+      const item = isCombo ? chosen.triad : chosen;
+      const invItem = isCombo ? chosen.inversion : pick(invPool);
       const style = pick(stylePool).code;
       const rootMidi = 50 + Math.floor(Math.random()*9);
       let voicing = chordVoicing(item.semis, invItem.code);
@@ -1026,7 +1064,7 @@
       if(style === 'block'){ playMode = 'together'; }
       else if(style === 'arp-down'){ voicing = voicing.slice().reverse(); }
       const midiNotes = voicing.map(s => rootMidi + s);
-      return { code: item.code, midiNotes, soundPick: soundResult.soundPick, playMode, pool };
+      return { code: chosen.code, midiNotes, soundPick: soundResult.soundPick, playMode, pool };
     }
 
     if(state.mode === 'timbre'){
@@ -1037,6 +1075,12 @@
   }
 
   function labelFor(mode, code){
+    if(mode === 'triads' && String(code).indexOf('|') !== -1){
+      const parts = String(code).split('|');
+      const tr = TRIADS.find(x => x.code === parts[0]);
+      const iv = TRIAD_INVERSIONS.find(x => x.code === parts[1]);
+      if(tr && iv) return L(tr) + ', ' + L(iv);
+    }
     const src = mode === 'intervals' ? INTERVALS : mode === 'triads' ? TRIADS : TIMBRES;
     const found = src.find(x => x.code === code);
     return found ? L(found) : code;
@@ -1115,10 +1159,16 @@
     }
     renderScore();
 
+    const sp = state.current.soundPick;
     state.seriesLog.push({
+      mode: state.mode,
+      targetCode: correctCode,
+      userCode: code,
       targetLabel: labelFor(state.mode, correctCode),
       userLabel: labelFor(state.mode, code),
-      correct: isCorrect
+      correct: isCorrect,
+      // In the "Timbres" section the timbre IS the answer, so nothing extra to note there.
+      sound: (state.mode !== 'timbre' && sp) ? { kind: sp.kind, code: sp.kind === 'synth' ? sp.wave : sp.code } : null
     });
     state.seriesIndex += 1;
 
@@ -1131,6 +1181,19 @@
     return state.mode === 'intervals' ? T('navIntervals') : state.mode === 'triads' ? T('navTriads') : T('navTimbre');
   }
 
+  // Labels are resolved when the summary is drawn (not when the answer was
+  // given), so switching language re-labels everything. Older entries that
+  // only carry ready-made strings still work.
+  function entryTargetLabel(e){ return (e.mode && e.targetCode != null) ? labelFor(e.mode, e.targetCode) : e.targetLabel; }
+  function entryUserLabel(e){ return (e.mode && e.userCode != null) ? labelFor(e.mode, e.userCode) : e.userLabel; }
+  function entryTimbreLabel(e){
+    if(!e.sound) return '';
+    const found = e.sound.kind === 'synth'
+      ? TIMBRES.find(x => x.wave === e.sound.code || x.code === e.sound.code)
+      : INSTRUMENTS.find(x => x.code === e.sound.code);
+    return found ? L(found) : '';
+  }
+
   function buildSummaryText(){
     const correctCount = state.seriesLog.filter(l=>l.correct).length;
     const lines = [];
@@ -1140,8 +1203,11 @@
     lines.push(T('summaryResult') + correctCount + ' ' + T('ofWord') + ' ' + state.seriesLog.length + ' ' + T('correctWord'));
     lines.push('');
     state.seriesLog.forEach((entry, i)=>{
-      let line = (i+1) + '. ' + entry.targetLabel + ' — ' + (entry.correct ? T('lineCorrectWord') : T('lineIncorrectWord'));
-      if(!entry.correct) line += ' (' + T('summaryYourAnswer') + entry.userLabel + ')';
+      let line = (i+1) + '. ' + entryTargetLabel(entry) + ' — ' + (entry.correct ? T('lineCorrectWord') : T('lineIncorrectWord'));
+      if(!entry.correct){
+        const tim = entryTimbreLabel(entry);
+        line += ' (' + T('summaryYourAnswer') + entryUserLabel(entry) + (tim ? '; ' + T('summaryTimbre') + tim : '') + ')';
+      }
       lines.push(line);
     });
     return lines.join('\n');
@@ -1197,9 +1263,10 @@
       const badgeText = entry.correct ? T('badgeCorrect') : T('badgeWrong');
       html += '<div class="summary-row">' +
         '<span class="summary-idx">' + (i+1) + '.</span>' +
-        '<span class="summary-target">' + escapeHtml(entry.targetLabel) + '</span>' +
+        '<span class="summary-target">' + escapeHtml(entryTargetLabel(entry)) + '</span>' +
         '<span class="' + badgeClass + '">' + badgeText + '</span>' +
-        (!entry.correct ? '<span class="summary-user">' + escapeHtml(T('summaryYourAnswer')) + escapeHtml(entry.userLabel) + '</span>' : '') +
+        (!entry.correct ? '<span class="summary-user">' + escapeHtml(T('summaryYourAnswer')) + escapeHtml(entryUserLabel(entry)) + '</span>' : '') +
+        (!entry.correct && entryTimbreLabel(entry) ? '<span class="summary-user">' + escapeHtml(T('summaryTimbre')) + escapeHtml(entryTimbreLabel(entry)) + '</span>' : '') +
         '</div>';
     });
     html += '</div>';
@@ -1302,7 +1369,8 @@
       ensureCtx, state,
       loadedInstruments, ensureWafPlayer, playLibrarySequence, previewSound, playSynthSequence,
       queueLoadInstrument, notifyInstrumentReady, startRound, resetSeries,
-      UI, T, L, applyLanguage, labelFor, modeLabel, buildSummaryText
+      UI, T, L, applyLanguage, labelFor, modeLabel, buildSummaryText,
+      handleAnswer, triadAnswerCombos, renderSummaryPanel, entryTimbreLabel
     };
   }
 })();
