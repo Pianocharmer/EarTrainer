@@ -47,7 +47,7 @@
   .brand .fork{ font-size: 26px; transform: rotate(-8deg); display:inline-block; }
   .brand .tag{ color: var(--muted); font-size: 14px; font-family:'IBM Plex Mono', monospace; }
 
-  .score{ font-family:'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); display:flex; gap: 18px; align-items:center; }
+  .score{ font-family:'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); display:flex; flex-wrap: wrap; gap: 8px 18px; align-items:center; }
   .score b{ color: var(--accent); font-weight:600; }
   .score button{
     background: none; border: 1px solid var(--panel-line); color: var(--muted);
@@ -76,9 +76,18 @@
   nav.modes button.active{ background: var(--accent); color: #241505; }
   nav.modes button:not(.active):hover{ color: var(--text); }
 
-  .layout{ display:grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
-  .layout.wide-panel{ grid-template-columns: 420px 1fr; }
-  @media (max-width: 760px){ .layout, .layout.wide-panel{ grid-template-columns: 1fr; } }
+  /* minmax(0, 1fr) instead of 1fr: a plain 1fr track refuses to shrink below the
+     minimum width of its content, and the answer-button grid inside the stage
+     asks for ~4 columns of 150px. On phones that stretched the whole page
+     (the stage ran off the right edge). */
+  .layout{ display:grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .layout.wide-panel{ grid-template-columns: 420px minmax(0, 1fr); }
+  .layout > *{ min-width: 0; }
+  @media (max-width: 760px){
+    .layout, .layout.wide-panel{ grid-template-columns: minmax(0, 1fr); }
+    .stage{ padding: 26px 14px; }
+    .wrap{ padding-left: 14px; padding-right: 14px; }
+  }
 
   .panel{ background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--radius-panel); padding: 20px; }
   .panel h2{ font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); margin: 0; font-weight: 500; }
@@ -126,7 +135,7 @@
 
   .series-progress{ font-family:'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted-2); letter-spacing: 0.3px; }
 
-  #stageContent{ display:flex; flex-direction: column; align-items:center; gap: 20px; width:100%; }
+  #stageContent{ display:flex; flex-direction: column; align-items:center; gap: 20px; width:100%; min-width:0; }
   .stage-controls-row{ display:flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
   #soundInfo{ max-width: 480px; text-align:center; color: var(--muted); font-family:'Fraunces', serif; font-style: italic; font-size: 16px; line-height:1.6; }
@@ -151,7 +160,7 @@
 
   .prompt{ font-family:'Fraunces', serif; font-style: italic; color: var(--muted); font-size: 15px; text-align:center; min-height: 20px; }
 
-  .answers{ display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; width: 100%; max-width: 640px; }
+  .answers{ display:grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: 10px; width: 100%; max-width: 640px; }
   .ans-btn{
     font-family:'Inter', sans-serif; font-size: 14px; font-weight: 500; background: var(--bg-2);
     border: 1px solid var(--panel-line); color: var(--text); padding: 13px 12px; border-radius: var(--radius-btn);
