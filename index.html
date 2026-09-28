@@ -120,6 +120,12 @@
   .radio-row label{ display:flex; align-items:center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor:pointer; font-size: 14px; }
   .radio-row label:hover{ background: rgba(255,255,255,0.04); }
   .radio-row input{ accent-color: var(--accent); }
+  .radio-row label.disabled{ opacity: .45; cursor: not-allowed; }
+  .radio-row label.disabled input{ cursor: not-allowed; }
+  .notice{
+    font-size: 12.5px; line-height: 1.5; color: var(--accent); background: rgba(232,161,60,0.08);
+    border: 1px solid rgba(232,161,60,0.25); border-radius: 8px; padding: 8px 10px; margin: 10px 0 0;
+  }
 
   .num-input{
     width: 100%; background: var(--bg-2); border: 1px solid var(--panel-line); color: var(--text);
@@ -537,6 +543,10 @@
     footerText:          { ua:'Якщо звук не відтворюється, переконайтеся, що пристрій не в беззвучному режимі, або оновіть сторінку.',
                             en:"If there is no sound, make sure your device is not in silent mode, or refresh the page." },
 
+    augOnlyNote:         { ua:'Визначення на слух обернень збільшеного тризвуку не проводиться, оскільки обернення енгармонічно рівні.',
+                            en:'Identifying inversions of the augmented triad by ear is not practiced, because its inversions are enharmonically equal.' },
+    errBassSimultaneous: { ua:'Радимо обрати інший тембр або послідовне відтворення. В піснях бас-гітара зазвичай звучить в один голос, таке тренування буде більш ефективним.',
+                            en:'We recommend choosing another timbre or sequential playback. In songs the bass guitar usually plays a single line, so this kind of training will be more effective.' },
     triadTrainModeTitle: { ua:'Режим тренування', en:'Training mode' },
     triadModeTypeInv:    { ua:'тренувати тип тризвуку та обернення', en:'train chord type and inversion' },
     triadModeTypeOnly:   { ua:'тренувати лише тип тризвуку', en:'train chord type only' },
@@ -761,12 +771,28 @@
     }
 
     if(state.mode === 'triads'){
-      settingsPanel.appendChild(buildRadio(T('triadTrainModeTitle'), [
+      const modeBox = buildRadio(T('triadTrainModeTitle'), [
         {v:'type_inv',  l:UI.triadModeTypeInv.ua,  en:UI.triadModeTypeInv.en},
         {v:'type_only', l:UI.triadModeTypeOnly.ua, en:UI.triadModeTypeOnly.en}
-      ], state.triadAnswerMode, v => { state.triadAnswerMode = v; resetSeries(); }));
+      ], state.triadAnswerMode, v => { state.triadAnswerMode = v; resetSeries(); });
+      settingsPanel.appendChild(modeBox);
+      const augNote = document.createElement('p');
+      augNote.className = 'notice';
+      augNote.textContent = T('augOnlyNote');
+      settingsPanel.appendChild(augNote);
+      // Keep the "type + inversion" option and its explanation in step with
+      // the ticked chord types (called now and whenever a type is toggled).
+      const syncAugNotice = () => {
+        const only = onlyAugmentedSelected();
+        augNote.style.display = only ? '' : 'none';
+        const labels = modeBox.querySelectorAll('label');
+        const inputs = modeBox.querySelectorAll('input');
+        if(labels[0]) labels[0].classList.toggle('disabled', only);
+        if(inputs[0]) inputs[0].disabled = only;
+      };
+      syncAugNotice();
       settingsPanel.appendChild(divider());
-      settingsPanel.appendChild(buildChecklist(T('triadsTitle'), TRIADS, state.enabled.triads));
+      settingsPanel.appendChild(buildChecklist(T('triadsTitle'), TRIADS, state.enabled.triads, { onCheck: syncAugNotice }));
       settingsPanel.appendChild(divider());
       settingsPanel.appendChild(buildChecklist(T('inversionsTitle'), TRIAD_INVERSIONS, state.enabled.inversions));
       settingsPanel.appendChild(divider());
@@ -954,11 +980,31 @@
   // ---------- round logic ----------
   function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
+  const AUGMENTED_CODE = 'aug';
+  const BASS_CODE = 'bass';
+
+  // Only "augmented" ticked: there is nothing to tell apart by inversion.
+  function onlyAugmentedSelected(){
+    return state.enabled.triads.size === 1 && state.enabled.triads.has(AUGMENTED_CODE);
+  }
+
+  // Real instruments in use and bass guitar is the only one chosen.
+  function selectedOnlyBass(){
+    return state.soundEngine === 'library' && state.enabled.instruments.size === 1 && state.enabled.instruments.has(BASS_CODE);
+  }
+
   // Answer options for "chord type + inversion" training: every enabled chord
   // type combined with every enabled inversion, e.g. "major, first inversion".
   function triadAnswerCombos(){
     const combos = [];
     TRIADS.filter(t => state.enabled.triads.has(t.code)).forEach(tr => {
+      if(tr.code === AUGMENTED_CODE){
+        // All inversions of an augmented triad are enharmonically equal (it
+        // is symmetrical: major third + major third), so they cannot be told
+        // apart by ear. Offer one answer and always play it in root position.
+        combos.push({ code: tr.code, label: tr.label, en: tr.en || tr.label, triad: tr, inversion: TRIAD_INVERSIONS[0] });
+        return;
+      }
       TRIAD_INVERSIONS.filter(iv => state.enabled.inversions.has(iv.code)).forEach(iv => {
         combos.push({
           code: tr.code + '|' + iv.code,
@@ -980,7 +1026,9 @@
     if(state.mode === 'timbre') return TIMBRES.filter(t => state.enabled.timbre.has(t.code));
   }
 
-  function pickSoundForTrainingRound(){
+  // simultaneous = the notes of this round sound together (chord / "at once").
+  // The bass guitar is a single-voice instrument, so it never plays those.
+  function pickSoundForTrainingRound(simultaneous){
     if(state.soundEngine === 'synth'){
       const wavePool = TIMBRES.filter(t => state.enabled.waveforms.has(t.code));
       if(wavePool.length === 0){
@@ -988,7 +1036,8 @@
       }
       return { soundPick: { kind:'synth', wave: pick(wavePool).wave } };
     }
-    const instrPool = INSTRUMENTS.filter(i => state.enabled.instruments.has(i.code) && loadedInstruments[i.code]);
+    const instrPool = INSTRUMENTS.filter(i => state.enabled.instruments.has(i.code) && loadedInstruments[i.code]
+                                              && !(simultaneous && i.code === BASS_CODE));
     if(instrPool.length === 0){
       const anyEnabled = INSTRUMENTS.some(i => state.enabled.instruments.has(i.code));
       userWaitingForInstrument = anyEnabled;
@@ -998,6 +1047,11 @@
   }
 
   function buildRound(){
+    if(state.mode === 'triads' && state.triadAnswerMode === 'type_inv' && onlyAugmentedSelected()){
+      promptEl.textContent = T('augOnlyNote');
+      answersEl.innerHTML = '';
+      return null;
+    }
     if(state.mode === 'triads' && state.triadAnswerMode === 'type_inv'
        && state.enabled.triads.size > 0 && state.enabled.inversions.size === 0){
       promptEl.textContent = T('errPickInversion');
@@ -1012,20 +1066,29 @@
     }
 
     if(state.mode === 'intervals'){
-      const dirPool = DIRECTIONS.filter(d => state.enabled.direction.has(d.code));
+      let dirPool = DIRECTIONS.filter(d => state.enabled.direction.has(d.code));
       if(dirPool.length === 0){
         promptEl.textContent = T('errPickStyle');
         answersEl.innerHTML = '';
         return null;
       }
-      const soundResult = pickSoundForTrainingRound();
+      if(selectedOnlyBass()){
+        dirPool = dirPool.filter(d => d.code !== 'together');
+        if(dirPool.length === 0){
+          userWaitingForInstrument = false;
+          promptEl.textContent = T('errBassSimultaneous');
+          answersEl.innerHTML = '';
+          return null;
+        }
+      }
+      const dir = pick(dirPool).code;
+      const soundResult = pickSoundForTrainingRound(dir === 'together');
       if(soundResult.error){
         promptEl.textContent = soundResult.error;
         answersEl.innerHTML = '';
         return null;
       }
       const item = pick(pool);
-      const dir = pick(dirPool).code;
       const isBass = soundResult.soundPick.kind === 'library' && soundResult.soundPick.code === 'bass';
       const rootMidi = pickIntervalRootMidi(isBass);
       let midiNotes;
@@ -1041,13 +1104,23 @@
         answersEl.innerHTML = '';
         return null;
       }
-      const stylePool = CHORD_STYLES.filter(s => state.enabled.chordStyle.has(s.code));
+      let stylePool = CHORD_STYLES.filter(s => state.enabled.chordStyle.has(s.code));
       if(stylePool.length === 0){
         promptEl.textContent = T('errPickStyle');
         answersEl.innerHTML = '';
         return null;
       }
-      const soundResult = pickSoundForTrainingRound();
+      if(selectedOnlyBass()){
+        stylePool = stylePool.filter(s => s.code !== 'block');
+        if(stylePool.length === 0){
+          userWaitingForInstrument = false;
+          promptEl.textContent = T('errBassSimultaneous');
+          answersEl.innerHTML = '';
+          return null;
+        }
+      }
+      const style = pick(stylePool).code;
+      const soundResult = pickSoundForTrainingRound(style === 'block');
       if(soundResult.error){
         promptEl.textContent = soundResult.error;
         answersEl.innerHTML = '';
@@ -1057,7 +1130,6 @@
       const isCombo = !!chosen.triad;          // "type + inversion" answer mode
       const item = isCombo ? chosen.triad : chosen;
       const invItem = isCombo ? chosen.inversion : pick(invPool);
-      const style = pick(stylePool).code;
       const rootMidi = 50 + Math.floor(Math.random()*9);
       let voicing = chordVoicing(item.semis, invItem.code);
       let playMode = 'seq';
@@ -1370,7 +1442,8 @@
       loadedInstruments, ensureWafPlayer, playLibrarySequence, previewSound, playSynthSequence,
       queueLoadInstrument, notifyInstrumentReady, startRound, resetSeries,
       UI, T, L, applyLanguage, labelFor, modeLabel, buildSummaryText,
-      handleAnswer, triadAnswerCombos, renderSummaryPanel, entryTimbreLabel
+      handleAnswer, triadAnswerCombos, renderSummaryPanel, entryTimbreLabel,
+      onlyAugmentedSelected, selectedOnlyBass, promptEl
     };
   }
 })();
