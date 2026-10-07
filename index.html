@@ -436,9 +436,36 @@
     const name = info.code === 'bass' ? info.file : info.file + '_' + rangeCode;
     return SOUNDS_BASE + name + '-mp3.js';
   }
-  // Loaded instruments are kept per range, so switching back and forth does not reload anything.
-  const instrumentCache = {};
-  function cacheKey(code){ return code === 'bass' ? 'bass' : code + '@' + state.range; }
+  // Several ranges can be ticked at once; every example then comes from one of them, at random.
+  // Each (instrument, range) pair is a separate download, kept in this cache for the whole visit.
+  // A downloaded file also covers 2 semitones beyond its range (FILE_MARGIN).
+  const FILE_MARGIN = 2;
+  const instrumentCache = {};     // 'violin@mid' -> smplr instrument ('bass' for the bass guitar)
+  function slotKey(code, rangeCode){ return code === 'bass' ? 'bass' : code + '@' + rangeCode; }
+  function activeRanges(){
+    const a = RANGES.filter(r => state.ranges.has(r.code)).map(r => r.code);
+    return a.length ? a : [DEFAULT_RANGE];
+  }
+  function slotsFor(code){ return code === 'bass' ? ['bass'] : activeRanges().map(r => code + '@' + r); }
+  function isReady(code, rangeCode){ return !!instrumentCache[slotKey(code, rangeCode)]; }
+  // loadedInstruments[code] is set only when the instrument is ready for ALL ticked ranges.
+  function refreshLoaded(){
+    INSTRUMENTS.forEach(i => {
+      const slots = slotsFor(i.code);
+      if(slots.every(k => instrumentCache[k])) loadedInstruments[i.code] = instrumentCache[slots[0]];
+      else delete loadedInstruments[i.code];
+    });
+  }
+  // The loaded file that can play all of these notes (a round's notes always lie in its range).
+  function instrumentFor(code, midiNotes){
+    if(code === 'bass') return instrumentCache.bass || null;
+    const lo = Math.min.apply(null, midiNotes), hi = Math.max.apply(null, midiNotes);
+    for(const r of RANGES){
+      const inst = instrumentCache[code + '@' + r.code];
+      if(inst && lo >= r.min - FILE_MARGIN && hi <= r.max + FILE_MARGIN) return inst;
+    }
+    return null;
+  }
 
   // smplr (danigb, MIT) is a classic script exposing window.smplr; the engine is its Soundfont factory.
   function ensureSoundEngine(){
@@ -467,7 +494,11 @@
   const loadedInstruments = {};
   const loadQueue = [];
   let loadingInProgress = false;
-  let currentlyLoadingCode = null;
+  let currentlyLoadingKey = null;        // 'violin@mid'
+  let loadingIsPrefetch = false;
+  let prefetchTimer = null;
+  const failedPrefetch = {};
+  const PREFETCH_DELAY_MS = 2000;
   let stagePendingInstrument = null; // instrument code shown as "loading" on the main stage, if any
   // True only if the person actually pressed Play and we had to tell them to wait
   // for the sample. Without this, the page would start playing on its own the
@@ -476,7 +507,8 @@
 
   function instrumentStatusText(code){
     if(loadedInstruments[code]) return T('statusReady');
-    if(currentlyLoadingCode === code || loadQueue.indexOf(code) !== -1) return T('statusLoading');
+    if((currentlyLoadingKey && !loadingIsPrefetch && currentlyLoadingKey.split('@')[0] === code)
+       || loadQueue.some(k => k.split('@')[0] === code)) return T('statusLoading');
     return T('statusNotLoaded');
   }
 
@@ -493,6 +525,7 @@
   // click Play a second time - this matters most on mobile, where the first
   // real-instrument download can take a while.
   function notifyInstrumentReady(code){
+    refreshLoaded();
     updateLoadStatus(code);
     if(stagePendingInstrument === code){
       stagePendingInstrument = null;
@@ -508,58 +541,79 @@
 
   function processLoadQueue(){
     if(loadingInProgress) return;
-    const code = loadQueue.shift();
-    if(!code){ currentlyLoadingCode = null; return; }
-    if(loadedInstruments[code]){ processLoadQueue(); return; }
-    currentlyLoadingCode = code;
-    loadingInProgress = true;
-    updateLoadStatus(code);
-    const info = INSTRUMENTS.find(i => i.code === code);
-    const key = cacheKey(code);
-    if(instrumentCache[key]){            // already downloaded for this range
-      loadedInstruments[code] = instrumentCache[key];
-      loadingInProgress = false; notifyInstrumentReady(code); processLoadQueue(); return;
-    }
-    const c = ensureCtx();
-    const engine = ensureSoundEngine();
-    if(!engine || !info){ loadingInProgress = false; processLoadQueue(); return; }
-    const opts = { instrumentUrl: instrumentUrl(info, state.range), extraGain: 2 };
-    if(typeof location !== 'undefined' && location.protocol === 'file:') opts.storage = scriptTagStorage;
-    let inst;
-    try { inst = engine(c, opts); } catch(e){ inst = null; }
-    if(!inst){ loadingInProgress = false; currentlyLoadingCode = null; updateLoadStatus(code); processLoadQueue(); return; }
-    inst.ready.then(function(){
-      instrumentCache[key] = inst;
-      loadingInProgress = false;
-      if(cacheKey(code) === key){        // the range may have changed while this was downloading
-        loadedInstruments[code] = inst;
-        notifyInstrumentReady(code);
-      } else {
-        updateLoadStatus(code);
-      }
-      processLoadQueue();
-    }).catch(function(){
-      loadingInProgress = false;
-      currentlyLoadingCode = null;
-      updateLoadStatus(code);
-      processLoadQueue();
-    });
+    const key = loadQueue.shift();
+    if(!key){ currentlyLoadingKey = null; schedulePrefetch(); return; }
+    loadKey(key, false);
   }
 
-  function applyRange(id){
-    if(!RANGES.some(r => r.code === id)) return;
-    state.range = id;
-    INSTRUMENTS.forEach(i => {
-      const cached = instrumentCache[cacheKey(i.code)];
-      if(cached) loadedInstruments[i.code] = cached; else delete loadedInstruments[i.code];
-    });
+  function loadKey(key, isPrefetch){
+    const code = key.split('@')[0], rangeCode = key.split('@')[1];
+    const info = INSTRUMENTS.find(i => i.code === code);
+    currentlyLoadingKey = key; loadingIsPrefetch = isPrefetch; loadingInProgress = true;
+    if(!isPrefetch) updateLoadStatus(code);
+    const done = function(ok){
+      loadingInProgress = false; currentlyLoadingKey = null; loadingIsPrefetch = false;
+      if(!ok && isPrefetch) failedPrefetch[key] = true;
+      refreshLoaded();
+      updateLoadStatus(code);
+      if(ok && slotsFor(code).indexOf(key) !== -1) notifyInstrumentReady(code);
+      processLoadQueue();
+    };
+    if(instrumentCache[key]){ done(true); return; }
+    const c = ensureCtx();
+    const engine = ensureSoundEngine();
+    if(!engine || !info){ done(false); return; }
+    const opts = { instrumentUrl: instrumentUrl(info, rangeCode), extraGain: 2 };
+    if(typeof location !== 'undefined' && location.protocol === 'file:') opts.storage = scriptTagStorage;
+    let inst;
+    try { inst = engine(c, opts); } catch(e){ done(false); return; }
+    inst.ready.then(function(){ instrumentCache[key] = inst; done(true); }).catch(function(){ done(false); });
+  }
+
+  // Once what the student asked for is downloaded, quietly fetch the other ranges of the
+  // enabled instruments, one file at a time, so ticking another range later is instant.
+  // Skipped when the browser asks to save data.
+  function nextPrefetchKey(){
+    if(state.soundEngine !== 'library') return null;
+    if(typeof navigator !== 'undefined' && navigator.connection && navigator.connection.saveData) return null;
+    const active = activeRanges();
+    for(const r of RANGES){
+      if(active.indexOf(r.code) !== -1) continue;
+      for(const code of state.enabled.instruments){
+        const k = slotKey(code, r.code);
+        if(code !== 'bass' && !instrumentCache[k] && !failedPrefetch[k]) return k;
+      }
+    }
+    return null;
+  }
+  function schedulePrefetch(){
+    if(prefetchTimer || !nextPrefetchKey()) return;
+    prefetchTimer = setTimeout(function(){
+      prefetchTimer = null;
+      if(loadingInProgress || loadQueue.length) return;
+      const k = nextPrefetchKey();
+      if(k) loadKey(k, true);
+    }, PREFETCH_DELAY_MS);
+    if(prefetchTimer && prefetchTimer.unref) prefetchTimer.unref();
+  }
+
+  // Called after the set of ticked ranges changed.
+  function onRangesChanged(lastCode){
+    if(state.ranges.size === 0) state.ranges.add(lastCode || DEFAULT_RANGE);   // at least one range stays ticked
+    refreshLoaded();
     if(state.soundEngine === 'library') state.enabled.instruments.forEach(code => queueLoadInstrument(code));
     INSTRUMENTS.forEach(i => updateLoadStatus(i.code));
   }
+  function setRangeSelected(code, on){
+    if(!RANGES.some(r => r.code === code)) return;
+    if(on) state.ranges.add(code); else if(state.ranges.size > 1) state.ranges.delete(code);
+    onRangesChanged(code);
+  }
 
   function queueLoadInstrument(code){
-    if(loadedInstruments[code] || loadQueue.indexOf(code) !== -1) { updateLoadStatus(code); return; }
-    loadQueue.push(code);
+    slotsFor(code).forEach(k => {
+      if(!instrumentCache[k] && loadQueue.indexOf(k) === -1 && currentlyLoadingKey !== k) loadQueue.push(k);
+    });
     updateLoadStatus(code);
     processLoadQueue();
   }
@@ -567,7 +621,7 @@
   function playLibrarySequence(midiNotes, code, mode){
     const c = ensureCtx();
     const engine = ensureSoundEngine();
-    const preset = loadedInstruments[code];
+    const preset = instrumentFor(code, midiNotes);
     if(!engine || !preset) return;
     const base = c.currentTime; // must be absolute AudioContext time, not a bare offset
     if(mode === 'together'){
@@ -577,11 +631,11 @@
     }
   }
 
-  function rangeBounds(){ return RANGES.find(r => r.code === state.range) || RANGES[1]; }
-  // C-E-G triad whose C is the one nearest the middle of the chosen range (C2-E2-G2 for the bass guitar)
-  function previewNotes(isBass){
+  function rangeBounds(rangeCode){ return RANGES.find(r => r.code === rangeCode) || RANGES.find(r => r.code === DEFAULT_RANGE); }
+  // C-E-G triad whose C is the one nearest the middle of the range (C2-E2-G2 for the bass guitar)
+  function previewNotes(isBass, rangeCode){
     if(isBass) return [36, 40, 43];
-    const r = rangeBounds(), target = (r.min + r.max) / 2 - 3.5;
+    const r = rangeBounds(rangeCode), target = (r.min + r.max) / 2 - 3.5;
     let best = null;
     for(let c = Math.ceil(r.min / 12) * 12; c + 7 <= r.max; c += 12){
       if(best === null || Math.abs(c - target) < Math.abs(best - target)) best = c;
@@ -590,24 +644,28 @@
     return [best, best + 4, best + 7];
   }
   // Lowest note for a non-bass example whose notes (relative to it) span vmin..vmax: all notes stay inside the range.
-  function pickLowestNote(vmin, vmax){
-    const r = rangeBounds(), lo = r.min - vmin, hi = r.max - vmax;
+  function pickLowestNote(vmin, vmax, rangeCode){
+    const r = rangeBounds(rangeCode), lo = r.min - vmin, hi = r.max - vmax;
     return lo + Math.floor(Math.random() * (hi - lo + 1));
   }
 
   function previewSound(kind, payload){
-    // ascending C major triad inside the chosen range; the bass guitar plays it in its own low register
-    const midiNotes = previewNotes(kind !== 'synth' && payload === BASS_CODE);
+    const isBass = kind !== 'synth' && payload === BASS_CODE;
+    const act = activeRanges();
+    // preview in the first ticked range this instrument is already downloaded for
+    const rc = (kind !== 'synth' && !isBass && act.find(r => isReady(payload, r))) || act[0];
+    // ascending C major triad inside that range; the bass guitar plays it in its own low register
+    const midiNotes = previewNotes(isBass, rc);
     const gap = 0.32, dur = 0.5;    // snappy, clearly separated notes
     if(kind === 'synth'){
       const freqs = midiNotes.map(midiToFreq);
       freqs.forEach((f, i) => playTone(f, i * gap, dur, payload));
     } else {
-      if(!loadedInstruments[payload]){ queueLoadInstrument(payload); return; }
+      const preset = instrumentFor(payload, midiNotes);
+      if(!preset){ queueLoadInstrument(payload); return; }
       const c = ensureCtx();
       const engine = ensureSoundEngine();
-      const preset = loadedInstruments[payload];
-      if(!engine || !preset) return;
+      if(!engine) return;
       const base = c.currentTime;
       midiNotes.forEach((m, i) => preset.start({note: m, time: base + i * gap, duration: dur, velocity: 90}));
     }
@@ -698,9 +756,9 @@
     navTimbre:           { ua:'Тембри', en:'Timbres' },
     navSound:            { ua:'Звук', en:'Sound' },
     navRange:            { ua:'Діапазон', en:'Range' },
-    rangeTitle:          { ua:'Діапазон звучання', en:'Pitch range' },
-    rangeHint:           { ua:'Вибраний діапазон застосовується до розділів «Інтервали» та «Тризвуки»: усі ноти прикладу лежать у цих межах. Бас-гітара завжди звучить у діапазоні E1–G3. Звуки для вибраного діапазону завантажуються окремо (одноразово).',
-                            en:'The chosen range applies to the “Intervals” and “Triads” sections: every note of an example lies within these limits. The bass guitar always plays within E1–G3. The sounds for the chosen range are downloaded separately (once).' },
+    rangeTitle:          { ua:'Діапазони звучання', en:'Pitch ranges' },
+    rangeHint:           { ua:'Можна обрати кілька діапазонів: кожен приклад береться з одного з них навмання. Усі ноти прикладу лежать у межах цього діапазону. Бас-гітара завжди звучить у діапазоні E1–G3. Звуки кожного діапазону завантажуються окремо: спершу вибрані, решта підвантажується у фоні, тож перемикатися потім можна без очікування.',
+                            en:'You can tick several ranges: each example comes from one of them at random, and every note of the example lies within that range. The bass guitar always plays within E1–G3. The sounds of each range are downloaded separately: the ticked ones first, the others quietly in the background, so switching later needs no waiting.' },
     playBtnTitle:        { ua:'Відтворити', en:'Play' },
     replayBtn:           { ua:'відтворити ще раз', en:'play again' },
     resetSeriesBtnTitle: { ua:'Почати серію з початку', en:'Restart the series' },
@@ -824,7 +882,7 @@
     lang: 'ua',
     triadAnswerMode: 'type_inv',   // 'type_inv' = answer with type + inversion, 'type_only' = type only
     soundEngine: DEFAULT_SOUND_ENGINE,
-    range: DEFAULT_RANGE,          // 'low' | 'mid' | 'high' (not used by the bass guitar)
+    ranges: new Set([DEFAULT_RANGE]),   // ticked pitch ranges: 'low' | 'mid' | 'high' (the bass guitar ignores them)
     enabled: {
       intervals: new Set(INTERVALS.map(i=>i.code)),
       direction: new Set(DIRECTIONS.map(d=>d.code)),
@@ -1076,7 +1134,10 @@
     }
 
     if(state.mode === 'range'){
-      settingsPanel.appendChild(buildRadio(T('rangeTitle'), RANGES.map(r => ({v:r.code, l:r.label, en:r.en})), state.range, v => applyRange(v)));
+      settingsPanel.appendChild(buildChecklist(T('rangeTitle'), RANGES, state.ranges, {
+        hideCode: true,
+        onCheck: (code, checked) => { const empty = state.ranges.size === 0; onRangesChanged(code); if(empty) renderSettings(); }
+      }));
       const p = document.createElement('p');
       p.className = 'hint';
       p.style.marginTop = '12px';
@@ -1199,7 +1260,7 @@
         status.textContent = opts.statusFn(item.code);
         if(loadedInstruments[item.code]) status.classList.add('ready');
         row.appendChild(status);
-      } else {
+      } else if(!opts.hideCode){
         const code = document.createElement('span');
         code.className = 'code';
         code.textContent = item.code;
@@ -1305,21 +1366,23 @@
   // simultaneous = the notes of this round sound together (chord / "at once").
   // The bass guitar is a single-voice instrument, so it never plays those.
   function pickSoundForTrainingRound(simultaneous){
+    // every round comes from one of the ticked ranges, chosen at random
+    const ranges = activeRanges().slice().sort(() => Math.random() - 0.5);
     if(state.soundEngine === 'synth'){
       const wavePool = TIMBRES.filter(t => state.enabled.waveforms.has(t.code));
       if(wavePool.length === 0){
         return { error: T('errPickTimbre') };
       }
-      return { soundPick: { kind:'synth', wave: pick(wavePool).wave } };
+      return { soundPick: { kind:'synth', wave: pick(wavePool).wave, range: ranges[0] } };
     }
-    const instrPool = INSTRUMENTS.filter(i => state.enabled.instruments.has(i.code) && loadedInstruments[i.code]
-                                              && !(simultaneous && i.code === BASS_CODE));
-    if(instrPool.length === 0){
-      const anyEnabled = INSTRUMENTS.some(i => state.enabled.instruments.has(i.code));
-      userWaitingForInstrument = anyEnabled;
-      return { error: anyEnabled ? T('errWaitInstruments') : T('errPickInstrument') };
+    for(const r of ranges){
+      const instrPool = INSTRUMENTS.filter(i => state.enabled.instruments.has(i.code) && isReady(i.code, r)
+                                                && !(simultaneous && i.code === BASS_CODE));
+      if(instrPool.length) return { soundPick: { kind:'library', code: pick(instrPool).code, range: r } };
     }
-    return { soundPick: { kind:'library', code: pick(instrPool).code } };
+    const anyEnabled = INSTRUMENTS.some(i => state.enabled.instruments.has(i.code));
+    userWaitingForInstrument = anyEnabled;
+    return { error: anyEnabled ? T('errWaitInstruments') : T('errPickInstrument') };
   }
 
   function buildRound(){
@@ -1366,7 +1429,7 @@
       }
       const item = pick(pool);
       const isBass = soundResult.soundPick.kind === 'library' && soundResult.soundPick.code === 'bass';
-      const rootMidi = isBass ? pickIntervalRootMidi(true) : pickLowestNote(0, item.semis);
+      const rootMidi = isBass ? pickIntervalRootMidi(true) : pickLowestNote(0, item.semis, soundResult.soundPick.range);
       let midiNotes;
       if(dir === 'down') midiNotes = [rootMidi + item.semis, rootMidi];
       else midiNotes = [rootMidi, rootMidi + item.semis];
@@ -1410,7 +1473,7 @@
       const isBassChord = soundResult.soundPick.kind === 'library' && soundResult.soundPick.code === BASS_CODE;
       const vRaw = chordVoicing(item.semis, invItem.code);
       const rootMidi = isBassChord ? 28 + Math.floor(Math.random()*12)          // E1..D#2
-                                   : pickLowestNote(Math.min(...vRaw), Math.max(...vRaw)); // inside the chosen range
+                                   : pickLowestNote(Math.min(...vRaw), Math.max(...vRaw), soundResult.soundPick.range); // inside the chosen range
       let voicing = chordVoicing(item.semis, invItem.code);
       let playMode = 'seq';
       if(style === 'block'){ playMode = 'together'; }
@@ -1719,7 +1782,8 @@
       INTERVALS, DIRECTIONS, TRIADS, TRIAD_INVERSIONS, CHORD_STYLES, TIMBRES, INSTRUMENTS,
       DEFAULT_SOUND_ENGINE, DEFAULT_INSTRUMENT_CODE,
       chordVoicing, midiToFreq, intervalRootRange, pickIntervalRootMidi,
-      RANGES, DEFAULT_RANGE, instrumentUrl, instrumentCache, applyRange, previewNotes, rangeBounds,
+      RANGES, DEFAULT_RANGE, instrumentUrl, instrumentCache, setRangeSelected, activeRanges, previewNotes, rangeBounds,
+      instrumentFor, refreshLoaded, isReady, nextPrefetchKey, slotKey,
       SEQ_GAP_SYNTH, SEQ_DUR_SYNTH, SEQ_GAP_LIB, SEQ_DUR_LIB,
       ensureCtx, state,
       loadedInstruments, ensureSoundEngine, playLibrarySequence, previewSound, playSynthSequence,
