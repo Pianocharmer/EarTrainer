@@ -1,0 +1,3 @@
+smplr - MIT License - Copyright (c) Daniel Gómez (danigb) - https://github.com/danigb/smplr
+FluidR3 GM SoundFont - Copyright (c) Frank Wen. Audio files rendered by midi-js-soundfonts (gleitz),
+  https://github.com/gleitz/midi-js-soundfonts - licensed under Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/us/)
