@@ -328,7 +328,30 @@
 
   // ---------- synth audio engine ----------
   let ctx = null;
+
+  // iOS puts Web Audio in the "ambient" session, which the silent switch mutes.
+  // Asking for a "playback" session makes the page sound like a media player.
+  // Safari 17+ exposes navigator.audioSession; older iOS switches the session
+  // once an <audio> element plays, so a looping silent clip is used there.
+  const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+  let silentKeepAlive = null;
+  function requestPlaybackSession(){
+    try{
+      if(navigator.audioSession){ navigator.audioSession.type = 'playback'; return; }
+    }catch(e){}
+    if(silentKeepAlive) return;
+    silentKeepAlive = new Audio(SILENT_WAV);
+    silentKeepAlive.loop = true;
+    silentKeepAlive.setAttribute('playsinline', '');
+    const p = silentKeepAlive.play();
+    if(p && p.catch) p.catch(function(){ silentKeepAlive = null; });
+  }
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden && silentKeepAlive){ silentKeepAlive.pause(); silentKeepAlive = null; }
+  });
+
   function ensureCtx(){
+    requestPlaybackSession();
     if(!ctx || ctx.state === 'closed'){ ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     if(ctx.state === 'suspended'){ ctx.resume(); }
     return ctx;
