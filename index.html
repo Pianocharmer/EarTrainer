@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preload" as="fetch" crossorigin href="https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/acoustic_grand_piano_mid-mp3.js">
 <script src="https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/smplr.js"></script>
 <style>
   :root{
@@ -144,14 +146,18 @@
   #stageContent{ display:flex; flex-direction: column; align-items:center; gap: 20px; width:100%; min-width:0; }
   .stage-controls-row{ display:flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   .sound-hint{
-    display:flex; align-items:center; gap: 8px; max-width: 380px;
-    font-family:'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted-2); text-align: left;
+    display:flex; align-items:center; gap: 10px; max-width: 380px; padding: 10px 12px; border-radius: 12px;
+    background: rgba(255, 170, 60, 0.16); background: color-mix(in srgb, var(--accent) 18%, transparent);
+    border: 1px solid var(--accent); color: var(--text); text-align: left;
+    font-family:'Inter', sans-serif; font-size: 14px; font-weight: 500; line-height: 1.35;
   }
+  .sound-hint::before{ content: '🔇'; font-size: 20px; flex-shrink: 0; }
+  .sound-hint span{ flex: 1; min-width: 0; }
   .sound-hint button{
-    flex-shrink: 0; background: none; border: none; color: var(--muted-2); font-size: 15px; line-height: 1;
-    cursor: pointer; padding: 2px 4px;
+    flex-shrink: 0; background: none; border: none; color: var(--text); font-size: 20px; line-height: 1;
+    cursor: pointer; padding: 2px 6px; opacity: 0.75;
   }
-  .sound-hint button:hover{ color: var(--muted); }
+  .sound-hint button:hover{ opacity: 1; }
 
   #soundInfo{ max-width: 480px; text-align:center; color: var(--muted); font-family:'Fraunces', serif; font-style: italic; font-size: 16px; line-height:1.6; }
 
@@ -277,6 +283,7 @@
     <button data-mode="triads">Тризвуки</button>
     <button data-mode="timbre">Тембри</button>
     <button data-mode="sound">Звук</button>
+    <button data-mode="range">Діапазон</button>
   </nav>
 
   <div class="layout" id="layoutGrid">
@@ -328,6 +335,12 @@
 
   // ---------- synth audio engine ----------
   let ctx = null;
+  function ensureCtx(){
+    requestPlaybackSession();
+    if(!ctx || ctx.state === 'closed'){ ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+    if(ctx.state === 'suspended'){ ctx.resume(); }
+    return ctx;
+  }
 
   // iOS puts Web Audio in the "ambient" session, which the silent switch mutes.
   // Asking for a "playback" session makes the page sound like a media player.
@@ -335,11 +348,15 @@
   // once an <audio> element plays, so a looping silent clip is used there.
   const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
   let silentKeepAlive = null;
+  function isIOS(){
+    if(typeof navigator === 'undefined') return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
   function requestPlaybackSession(){
     try{
       if(navigator.audioSession){ navigator.audioSession.type = 'playback'; return; }
     }catch(e){}
-    if(silentKeepAlive) return;
+    if(silentKeepAlive || !isIOS() || typeof Audio === 'undefined') return;   // <audio> trick only on iPhone/iPad
     silentKeepAlive = new Audio(SILENT_WAV);
     silentKeepAlive.loop = true;
     silentKeepAlive.setAttribute('playsinline', '');
@@ -394,17 +411,34 @@
   // ---------- real instrument samples (smplr + FluidR3 GM) ----------
   const SOUNDS_BASE = 'https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/';
   const INSTRUMENTS = [
-    {code:'piano1',     label:'Фортепіано (концертне)',  en:'Piano (concert)',           file:'acoustic_grand_piano', url: SOUNDS_BASE + 'acoustic_grand_piano-mp3.js'},
-    {code:'piano2',     label:'Електророяль',    en:'Electric grand piano',          file:'electric_grand_piano', url: SOUNDS_BASE + 'electric_grand_piano-mp3.js'},
-    {code:'harpsichord',label:'Клавесин',                 en:'Harpsichord',               file:'harpsichord', url: SOUNDS_BASE + 'harpsichord-mp3.js'},
-    {code:'epiano1',    label:'Електропіано (тембр 1)',   en:'Electric piano (timbre 1)', file:'electric_piano_1', url: SOUNDS_BASE + 'electric_piano_1-mp3.js'},
-    {code:'epiano2',    label:'Електропіано (тембр 2)',   en:'Electric piano (timbre 2)', file:'electric_piano_2', url: SOUNDS_BASE + 'electric_piano_2-mp3.js'},
-    {code:'guitar',     label:'Гітара',                   en:'Guitar',                    file:'acoustic_guitar_nylon', url: SOUNDS_BASE + 'acoustic_guitar_nylon-mp3.js'},
-    {code:'bass',       label:'Бас-гітара',               en:'Bass guitar',               file:'electric_bass_finger', url: SOUNDS_BASE + 'electric_bass_finger-mp3.js'},
-    {code:'violin',     label:'Скрипка',                  en:'Violin',                    file:'violin', url: SOUNDS_BASE + 'violin-mp3.js'},
-    {code:'flute',      label:'Флейта',                   en:'Flute',                     file:'flute', url: SOUNDS_BASE + 'flute-mp3.js'},
-    {code:'organ',      label:'Орган',                    en:'Organ',                     file:'church_organ', url: SOUNDS_BASE + 'church_organ-mp3.js'}
+    {code:'piano1',     label:'Фортепіано (концертне)',  en:'Piano (concert)',           file:'acoustic_grand_piano'},
+    {code:'piano2',     label:'Електророяль',    en:'Electric grand piano',          file:'electric_grand_piano'},
+    {code:'harpsichord',label:'Клавесин',                 en:'Harpsichord',               file:'harpsichord'},
+    {code:'epiano1',    label:'Електропіано (тембр 1)',   en:'Electric piano (timbre 1)', file:'electric_piano_1'},
+    {code:'epiano2',    label:'Електропіано (тембр 2)',   en:'Electric piano (timbre 2)', file:'electric_piano_2'},
+    {code:'guitar',     label:'Гітара',                   en:'Guitar',                    file:'acoustic_guitar_nylon'},
+    {code:'bass',       label:'Бас-гітара',               en:'Bass guitar',               file:'electric_bass_finger'},
+    {code:'violin',     label:'Скрипка',                  en:'Violin',                    file:'violin'},
+    {code:'flute',      label:'Флейта',                   en:'Flute',                     file:'flute'},
+    {code:'organ',      label:'Орган',                    en:'Organ',                     file:'church_organ'}
   ];
+
+  // Pitch ranges the student can choose (MIDI note numbers, all notes of an example stay inside).
+  // The sample files are split the same way: <instrument>_low / _mid / _high (see tools/trim_sounds.py).
+  // The bass guitar is not affected: it always plays E1-G3 and has a single file.
+  const RANGES = [
+    {code:'low',  min:24, max:59, label:'Низький: C1–B3',  en:'Low: C1–B3'},
+    {code:'mid',  min:52, max:79, label:'Середній: E3–G5', en:'Middle: E3–G5'},
+    {code:'high', min:67, max:96, label:'Високий: G4–C7',  en:'High: G4–C7'}
+  ];
+  const DEFAULT_RANGE = 'mid';
+  function instrumentUrl(info, rangeCode){
+    const name = info.code === 'bass' ? info.file : info.file + '_' + rangeCode;
+    return SOUNDS_BASE + name + '-mp3.js';
+  }
+  // Loaded instruments are kept per range, so switching back and forth does not reload anything.
+  const instrumentCache = {};
+  function cacheKey(code){ return code === 'bass' ? 'bass' : code + '@' + state.range; }
 
   // smplr (danigb, MIT) is a classic script exposing window.smplr; the engine is its Soundfont factory.
   function ensureSoundEngine(){
@@ -481,19 +515,28 @@
     loadingInProgress = true;
     updateLoadStatus(code);
     const info = INSTRUMENTS.find(i => i.code === code);
+    const key = cacheKey(code);
+    if(instrumentCache[key]){            // already downloaded for this range
+      loadedInstruments[code] = instrumentCache[key];
+      loadingInProgress = false; notifyInstrumentReady(code); processLoadQueue(); return;
+    }
     const c = ensureCtx();
     const engine = ensureSoundEngine();
     if(!engine || !info){ loadingInProgress = false; processLoadQueue(); return; }
-    const opts = { instrumentUrl: info.url, extraGain: 2 };
+    const opts = { instrumentUrl: instrumentUrl(info, state.range), extraGain: 2 };
     if(typeof location !== 'undefined' && location.protocol === 'file:') opts.storage = scriptTagStorage;
     let inst;
     try { inst = engine(c, opts); } catch(e){ inst = null; }
     if(!inst){ loadingInProgress = false; currentlyLoadingCode = null; updateLoadStatus(code); processLoadQueue(); return; }
     inst.ready.then(function(){
-      const preset = inst;
-      loadedInstruments[code] = preset;
+      instrumentCache[key] = inst;
       loadingInProgress = false;
-      notifyInstrumentReady(code);
+      if(cacheKey(code) === key){        // the range may have changed while this was downloading
+        loadedInstruments[code] = inst;
+        notifyInstrumentReady(code);
+      } else {
+        updateLoadStatus(code);
+      }
       processLoadQueue();
     }).catch(function(){
       loadingInProgress = false;
@@ -501,6 +544,17 @@
       updateLoadStatus(code);
       processLoadQueue();
     });
+  }
+
+  function applyRange(id){
+    if(!RANGES.some(r => r.code === id)) return;
+    state.range = id;
+    INSTRUMENTS.forEach(i => {
+      const cached = instrumentCache[cacheKey(i.code)];
+      if(cached) loadedInstruments[i.code] = cached; else delete loadedInstruments[i.code];
+    });
+    if(state.soundEngine === 'library') state.enabled.instruments.forEach(code => queueLoadInstrument(code));
+    INSTRUMENTS.forEach(i => updateLoadStatus(i.code));
   }
 
   function queueLoadInstrument(code){
@@ -523,9 +577,27 @@
     }
   }
 
+  function rangeBounds(){ return RANGES.find(r => r.code === state.range) || RANGES[1]; }
+  // C-E-G triad whose C is the one nearest the middle of the chosen range (C2-E2-G2 for the bass guitar)
+  function previewNotes(isBass){
+    if(isBass) return [36, 40, 43];
+    const r = rangeBounds(), target = (r.min + r.max) / 2 - 3.5;
+    let best = null;
+    for(let c = Math.ceil(r.min / 12) * 12; c + 7 <= r.max; c += 12){
+      if(best === null || Math.abs(c - target) < Math.abs(best - target)) best = c;
+    }
+    if(best === null) best = r.min;
+    return [best, best + 4, best + 7];
+  }
+  // Lowest note for a non-bass example whose notes (relative to it) span vmin..vmax: all notes stay inside the range.
+  function pickLowestNote(vmin, vmax){
+    const r = rangeBounds(), lo = r.min - vmin, hi = r.max - vmax;
+    return lo + Math.floor(Math.random() * (hi - lo + 1));
+  }
+
   function previewSound(kind, payload){
-    // ascending C major triad; the bass guitar plays it in its own low register (C2-E2-G2, inside E1-G3)
-    const midiNotes = (kind !== 'synth' && payload === BASS_CODE) ? [36, 40, 43] : [60, 64, 67];
+    // ascending C major triad inside the chosen range; the bass guitar plays it in its own low register
+    const midiNotes = previewNotes(kind !== 'synth' && payload === BASS_CODE);
     const gap = 0.32, dur = 0.5;    // snappy, clearly separated notes
     if(kind === 'synth'){
       const freqs = midiNotes.map(midiToFreq);
@@ -625,6 +697,10 @@
     navTriads:           { ua:'Тризвуки', en:'Triads' },
     navTimbre:           { ua:'Тембри', en:'Timbres' },
     navSound:            { ua:'Звук', en:'Sound' },
+    navRange:            { ua:'Діапазон', en:'Range' },
+    rangeTitle:          { ua:'Діапазон звучання', en:'Pitch range' },
+    rangeHint:           { ua:'Вибраний діапазон застосовується до розділів «Інтервали» та «Тризвуки»: усі ноти прикладу лежать у цих межах. Бас-гітара завжди звучить у діапазоні E1–G3. Звуки для вибраного діапазону завантажуються окремо (одноразово).',
+                            en:'The chosen range applies to the “Intervals” and “Triads” sections: every note of an example lies within these limits. The bass guitar always plays within E1–G3. The sounds for the chosen range are downloaded separately (once).' },
     playBtnTitle:        { ua:'Відтворити', en:'Play' },
     replayBtn:           { ua:'відтворити ще раз', en:'play again' },
     resetSeriesBtnTitle: { ua:'Почати серію з початку', en:'Restart the series' },
@@ -748,6 +824,7 @@
     lang: 'ua',
     triadAnswerMode: 'type_inv',   // 'type_inv' = answer with type + inversion, 'type_only' = type only
     soundEngine: DEFAULT_SOUND_ENGINE,
+    range: DEFAULT_RANGE,          // 'low' | 'mid' | 'high' (not used by the bass guitar)
     enabled: {
       intervals: new Set(INTERVALS.map(i=>i.code)),
       direction: new Set(DIRECTIONS.map(d=>d.code)),
@@ -882,7 +959,7 @@
     resetSeriesBtn.title = T('resetSeriesBtnTitle');
     resetSeriesBtn.textContent = T('resetSeriesBtn');
 
-    const navKeyByMode = { intervals:'navIntervals', triads:'navTriads', timbre:'navTimbre', sound:'navSound' };
+    const navKeyByMode = { intervals:'navIntervals', triads:'navTriads', timbre:'navTimbre', sound:'navSound', range:'navRange' };
     navModes.querySelectorAll('button[data-mode]').forEach(btn=>{
       btn.textContent = T(navKeyByMode[btn.dataset.mode]);
     });
@@ -949,7 +1026,7 @@
   function renderSettings(){
     settingsPanel.innerHTML = '';
 
-    if(state.mode !== 'sound'){
+    if(state.mode !== 'sound' && state.mode !== 'range'){
       settingsPanel.appendChild(buildSeriesLengthControl());
       settingsPanel.appendChild(divider());
     }
@@ -995,6 +1072,15 @@
       p.className = 'hint';
       p.style.marginTop = '12px';
       p.textContent = T('timbreHint');
+      settingsPanel.appendChild(p);
+    }
+
+    if(state.mode === 'range'){
+      settingsPanel.appendChild(buildRadio(T('rangeTitle'), RANGES.map(r => ({v:r.code, l:r.label, en:r.en})), state.range, v => applyRange(v)));
+      const p = document.createElement('p');
+      p.className = 'hint';
+      p.style.marginTop = '12px';
+      p.textContent = T('rangeHint');
       settingsPanel.appendChild(p);
     }
 
@@ -1280,7 +1366,7 @@
       }
       const item = pick(pool);
       const isBass = soundResult.soundPick.kind === 'library' && soundResult.soundPick.code === 'bass';
-      const rootMidi = pickIntervalRootMidi(isBass);
+      const rootMidi = isBass ? pickIntervalRootMidi(true) : pickLowestNote(0, item.semis);
       let midiNotes;
       if(dir === 'down') midiNotes = [rootMidi + item.semis, rootMidi];
       else midiNotes = [rootMidi, rootMidi + item.semis];
@@ -1320,7 +1406,11 @@
       const isCombo = !!chosen.triad;          // "type + inversion" answer mode
       const item = isCombo ? chosen.triad : chosen;
       const invItem = isCombo ? chosen.inversion : pick(invPool);
-      const rootMidi = 50 + Math.floor(Math.random()*9);
+      // Bass guitar: root low enough that the highest chord note (root + 16) stays <= G3 (55).
+      const isBassChord = soundResult.soundPick.kind === 'library' && soundResult.soundPick.code === BASS_CODE;
+      const vRaw = chordVoicing(item.semis, invItem.code);
+      const rootMidi = isBassChord ? 28 + Math.floor(Math.random()*12)          // E1..D#2
+                                   : pickLowestNote(Math.min(...vRaw), Math.max(...vRaw)); // inside the chosen range
       let voicing = chordVoicing(item.semis, invItem.code);
       let playMode = 'seq';
       if(style === 'block'){ playMode = 'together'; }
@@ -1595,10 +1685,10 @@
       state.mode = btn.dataset.mode;
       renderSettings();
       layoutGrid.classList.toggle('wide-panel', state.mode === 'sound');
-      if(state.mode === 'sound'){
+      if(state.mode === 'sound' || state.mode === 'range'){
         stageContent.style.display = 'none';
         summaryPanel.style.display = 'none';
-        soundInfo.style.display = '';
+        soundInfo.style.display = state.mode === 'sound' ? '' : 'none';
         seriesProgress.textContent = '';
         state.current = null;
       } else {
@@ -1629,6 +1719,7 @@
       INTERVALS, DIRECTIONS, TRIADS, TRIAD_INVERSIONS, CHORD_STYLES, TIMBRES, INSTRUMENTS,
       DEFAULT_SOUND_ENGINE, DEFAULT_INSTRUMENT_CODE,
       chordVoicing, midiToFreq, intervalRootRange, pickIntervalRootMidi,
+      RANGES, DEFAULT_RANGE, instrumentUrl, instrumentCache, applyRange, previewNotes, rangeBounds,
       SEQ_GAP_SYNTH, SEQ_DUR_SYNTH, SEQ_GAP_LIB, SEQ_DUR_LIB,
       ensureCtx, state,
       loadedInstruments, ensureSoundEngine, playLibrarySequence, previewSound, playSynthSequence,
@@ -1637,6 +1728,7 @@
       handleAnswer, triadAnswerCombos, renderSummaryPanel, entryTimbreLabel,
       onlyAugmentedSelected, selectedOnlyBass, promptEl,
       contactHref, contactEmail, aboutBodyHtml,
+      requestPlaybackSession, isIOS,
       isTouchDevice, maybeShowSoundHint, dismissSoundHint, soundHintDismissed, soundHint, playBtn
     };
   }
