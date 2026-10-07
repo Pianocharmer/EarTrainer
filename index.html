@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/WebAudioFontPlayer.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/smplr.js"></script>
 <style>
   :root{
     --bg: #142229;
@@ -143,6 +143,15 @@
 
   #stageContent{ display:flex; flex-direction: column; align-items:center; gap: 20px; width:100%; min-width:0; }
   .stage-controls-row{ display:flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .sound-hint{
+    display:flex; align-items:center; gap: 8px; max-width: 380px;
+    font-family:'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted-2); text-align: left;
+  }
+  .sound-hint button{
+    flex-shrink: 0; background: none; border: none; color: var(--muted-2); font-size: 15px; line-height: 1;
+    cursor: pointer; padding: 2px 4px;
+  }
+  .sound-hint button:hover{ color: var(--muted); }
 
   #soundInfo{ max-width: 480px; text-align:center; color: var(--muted); font-family:'Fraunces', serif; font-style: italic; font-size: 16px; line-height:1.6; }
 
@@ -219,6 +228,26 @@
   .summary-msg{ font-family:'IBM Plex Mono', monospace; font-size: 12px; color: var(--good); }
 
   footer{ text-align:center; color: var(--muted-2); font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; margin-top: 34px; }
+  footer p{ margin: 0; }
+  .footer-contact{ display:flex; flex-wrap: wrap; justify-content:center; align-items:center; gap: 10px 16px; margin-top: 18px; }
+  .footer-author{ font-family:'Fraunces', serif; font-size: 15px; color: var(--muted); }
+  .contact-btn{
+    font-family:'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--accent); text-decoration: none;
+    border: 1px solid rgba(232,161,60,0.45); padding: 8px 16px; border-radius: 999px;
+  }
+  .contact-btn:hover{ background: rgba(232,161,60,0.1); }
+  .footer-email{ font-family:'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted-2); overflow-wrap: anywhere; }
+  .about{ max-width: 620px; margin: 18px auto 0; }
+  .about summary{ cursor: pointer; display: inline-block; padding: 6px 4px; color: var(--muted); }
+  .about summary:hover{ color: var(--text); }
+  .about-body{
+    text-align: left; font-family:'Inter', sans-serif; font-size: 12.5px; line-height: 1.65; color: var(--muted);
+    background: var(--panel); border: 1px solid var(--panel-line); border-radius: 12px; padding: 14px 16px; margin-top: 8px;
+  }
+  .about-body p{ margin: 0 0 8px; }
+  .about-body ul{ margin: 6px 0 10px; padding-left: 18px; }
+  .about-body li{ margin-bottom: 6px; }
+  .about-body a{ color: var(--accent); overflow-wrap: anywhere; }
 
   @media (prefers-reduced-motion: reduce){ *{ transition: none !important; } }
 </style>
@@ -258,6 +287,10 @@
 
       <div id="stageContent">
         <button class="play-btn" id="playBtn" title="Відтворити">▶</button>
+        <div class="sound-hint" id="soundHint" style="display:none;">
+          <span id="soundHintText"></span>
+          <button type="button" id="soundHintClose" aria-label="Закрити">×</button>
+        </div>
         <div class="stage-controls-row">
           <button class="replay" id="replayBtn" disabled>відтворити ще раз</button>
           <button class="replay" id="resetSeriesBtn" type="button" title="Почати серію з початку">скинути серію</button>
@@ -276,7 +309,18 @@
     </div>
   </div>
 
-  <footer id="footerText">Якщо звук не відтворюється, переконайтеся, що пристрій не в беззвучному режимі, або оновіть сторінку.</footer>
+  <footer>
+    <p id="footerText">Якщо звук не відтворюється, переконайтеся, що пристрій не в беззвучному режимі, або оновіть сторінку.</p>
+    <div class="footer-contact">
+      <span class="footer-author" id="footerAuthor">Катерина Кухарічева</span>
+      <a class="contact-btn" id="contactBtn" href="#">Зворотний зв’язок</a>
+      <span class="footer-email" id="footerEmail"></span>
+    </div>
+    <details class="about" id="aboutBlock">
+      <summary id="aboutSummary">Про проєкт</summary>
+      <div class="about-body" id="aboutBody"></div>
+    </details>
+  </footer>
 </div>
 
 <script>
@@ -313,7 +357,7 @@
   // Sequential playback timing: SEQ_DUR must stay below SEQ_GAP, otherwise a
   // note's natural decay/sustain bleeds into the next one and "sequential"
   // ends up sounding like "simultaneous" (this happened before - see tests).
-  const SEQ_GAP_SYNTH = 0.99, SEQ_DUR_SYNTH = 0.98;
+  const SEQ_GAP_SYNTH = 0.84, SEQ_DUR_SYNTH = 0.83;
   const SEQ_GAP_LIB = 0.84, SEQ_DUR_LIB = 0.83;
 
   function playSynthSequence(freqs, wave, mode){
@@ -324,26 +368,44 @@
     }
   }
 
-  // ---------- WebAudioFont (real instrument samples) ----------
+  // ---------- real instrument samples (smplr + FluidR3 GM) ----------
   const SOUNDS_BASE = 'https://cdn.jsdelivr.net/gh/Pianocharmer/EarTrainer@main/sounds/';
   const INSTRUMENTS = [
-    {code:'piano1',     label:'Фортепіано (концертне)',  en:'Piano (concert)',           file:'0000_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0000_FluidR3_GM_sf2_file.js'},
-    {code:'piano2',     label:'Фортепіано (тембр 2)',    en:'Piano (timbre 2)',          file:'0000_GeneralUserGS_sf2_file',  url: SOUNDS_BASE + '0000_GeneralUserGS_sf2_file.js'},
-    {code:'harpsichord',label:'Клавесин',                 en:'Harpsichord',               file:'0060_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0060_FluidR3_GM_sf2_file.js'},
-    {code:'epiano1',    label:'Електропіано (тембр 1)',   en:'Electric piano (timbre 1)', file:'0040_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0040_FluidR3_GM_sf2_file.js'},
-    {code:'epiano2',    label:'Електропіано (тембр 2)',   en:'Electric piano (timbre 2)', file:'0050_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0050_FluidR3_GM_sf2_file.js'},
-    {code:'guitar',     label:'Гітара',                   en:'Guitar',                    file:'0240_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0240_FluidR3_GM_sf2_file.js'},
-    {code:'bass',       label:'Бас-гітара',               en:'Bass guitar',               file:'0330_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0330_FluidR3_GM_sf2_file.js'},
-    {code:'violin',     label:'Скрипка',                  en:'Violin',                    file:'0400_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0400_FluidR3_GM_sf2_file.js'},
-    {code:'flute',      label:'Флейта',                   en:'Flute',                     file:'0730_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0730_FluidR3_GM_sf2_file.js'},
-    {code:'organ',      label:'Орган',                    en:'Organ',                     file:'0190_FluidR3_GM_sf2_file',     url: SOUNDS_BASE + '0190_FluidR3_GM_sf2_file.js'}
+    {code:'piano1',     label:'Фортепіано (концертне)',  en:'Piano (concert)',           file:'acoustic_grand_piano', url: SOUNDS_BASE + 'acoustic_grand_piano-mp3.js'},
+    {code:'piano2',     label:'Електророяль',    en:'Electric grand piano',          file:'electric_grand_piano', url: SOUNDS_BASE + 'electric_grand_piano-mp3.js'},
+    {code:'harpsichord',label:'Клавесин',                 en:'Harpsichord',               file:'harpsichord', url: SOUNDS_BASE + 'harpsichord-mp3.js'},
+    {code:'epiano1',    label:'Електропіано (тембр 1)',   en:'Electric piano (timbre 1)', file:'electric_piano_1', url: SOUNDS_BASE + 'electric_piano_1-mp3.js'},
+    {code:'epiano2',    label:'Електропіано (тембр 2)',   en:'Electric piano (timbre 2)', file:'electric_piano_2', url: SOUNDS_BASE + 'electric_piano_2-mp3.js'},
+    {code:'guitar',     label:'Гітара',                   en:'Guitar',                    file:'acoustic_guitar_nylon', url: SOUNDS_BASE + 'acoustic_guitar_nylon-mp3.js'},
+    {code:'bass',       label:'Бас-гітара',               en:'Bass guitar',               file:'electric_bass_finger', url: SOUNDS_BASE + 'electric_bass_finger-mp3.js'},
+    {code:'violin',     label:'Скрипка',                  en:'Violin',                    file:'violin', url: SOUNDS_BASE + 'violin-mp3.js'},
+    {code:'flute',      label:'Флейта',                   en:'Flute',                     file:'flute', url: SOUNDS_BASE + 'flute-mp3.js'},
+    {code:'organ',      label:'Орган',                    en:'Organ',                     file:'church_organ', url: SOUNDS_BASE + 'church_organ-mp3.js'}
   ];
 
-  let wafPlayer = null;
-  function ensureWafPlayer(){
-    if(!wafPlayer && window.WebAudioFontPlayer){ wafPlayer = new WebAudioFontPlayer(); }
-    return wafPlayer;
+  // smplr (danigb, MIT) is a classic script exposing window.smplr; the engine is its Soundfont factory.
+  function ensureSoundEngine(){
+    return (typeof window !== 'undefined' && window.smplr && window.smplr.Soundfont) || null;
   }
+  // Over http(s) smplr fetches the instrument file itself. Over file:// browsers
+  // block fetch(), so (for local testing only) the file is read via a <script> tag.
+  const scriptTagStorage = {
+    fetch: function(url){
+      return new Promise(function(resolve, reject){
+        const sc = document.createElement('script');
+        sc.onload = function(){
+          const name = url.split('/').pop().replace('-mp3.js','');
+          const obj = window.MIDI && window.MIDI.Soundfont && window.MIDI.Soundfont[name];
+          if(!obj){ reject(new Error('no data')); return; }
+          const src = 'MIDI.Soundfont.x = ' + JSON.stringify(obj).slice(0, -1) + ',\n}';
+          resolve({ text: function(){ return Promise.resolve(src); } });
+        };
+        sc.onerror = function(){ reject(new Error('load failed')); };
+        sc.src = url;
+        document.head.appendChild(sc);
+      });
+    }
+  };
 
   const loadedInstruments = {};
   const loadQueue = [];
@@ -397,14 +459,23 @@
     updateLoadStatus(code);
     const info = INSTRUMENTS.find(i => i.code === code);
     const c = ensureCtx();
-    const wp = ensureWafPlayer();
-    if(!wp || !info){ loadingInProgress = false; processLoadQueue(); return; }
-    const varName = '_tone_' + info.file;
-    wp.loader.startLoad(c, info.url, varName);
-    wp.loader.waitLoad(function(){
-      loadedInstruments[code] = window[varName];
+    const engine = ensureSoundEngine();
+    if(!engine || !info){ loadingInProgress = false; processLoadQueue(); return; }
+    const opts = { instrumentUrl: info.url, extraGain: 2 };
+    if(typeof location !== 'undefined' && location.protocol === 'file:') opts.storage = scriptTagStorage;
+    let inst;
+    try { inst = engine(c, opts); } catch(e){ inst = null; }
+    if(!inst){ loadingInProgress = false; currentlyLoadingCode = null; updateLoadStatus(code); processLoadQueue(); return; }
+    inst.ready.then(function(){
+      const preset = inst;
+      loadedInstruments[code] = preset;
       loadingInProgress = false;
       notifyInstrumentReady(code);
+      processLoadQueue();
+    }).catch(function(){
+      loadingInProgress = false;
+      currentlyLoadingCode = null;
+      updateLoadStatus(code);
       processLoadQueue();
     });
   }
@@ -418,19 +489,20 @@
 
   function playLibrarySequence(midiNotes, code, mode){
     const c = ensureCtx();
-    const wp = ensureWafPlayer();
+    const engine = ensureSoundEngine();
     const preset = loadedInstruments[code];
-    if(!wp || !preset) return;
-    const base = c.currentTime; // queueWaveTable's "when" is absolute AudioContext time
+    if(!engine || !preset) return;
+    const base = c.currentTime; // must be absolute AudioContext time, not a bare offset
     if(mode === 'together'){
-      midiNotes.forEach(m => wp.queueWaveTable(c, c.destination, preset, base, m, 1.5, 0.7));
+      midiNotes.forEach(m => preset.start({note: m, time: base, duration: 1.5, velocity: 90}));
     } else {
-      midiNotes.forEach((m, i) => wp.queueWaveTable(c, c.destination, preset, base + i * SEQ_GAP_LIB, m, SEQ_DUR_LIB, 0.7));
+      midiNotes.forEach((m, i) => preset.start({note: m, time: base + i * SEQ_GAP_LIB, duration: SEQ_DUR_LIB, velocity: 90}));
     }
   }
 
   function previewSound(kind, payload){
-    const midiNotes = [60, 64, 67]; // ascending C major triad
+    // ascending C major triad; the bass guitar plays it in its own low register (C2-E2-G2, inside E1-G3)
+    const midiNotes = (kind !== 'synth' && payload === BASS_CODE) ? [36, 40, 43] : [60, 64, 67];
     const gap = 0.32, dur = 0.5;    // snappy, clearly separated notes
     if(kind === 'synth'){
       const freqs = midiNotes.map(midiToFreq);
@@ -438,11 +510,11 @@
     } else {
       if(!loadedInstruments[payload]){ queueLoadInstrument(payload); return; }
       const c = ensureCtx();
-      const wp = ensureWafPlayer();
+      const engine = ensureSoundEngine();
       const preset = loadedInstruments[payload];
-      if(!wp || !preset) return;
+      if(!engine || !preset) return;
       const base = c.currentTime;
-      midiNotes.forEach((m, i) => wp.queueWaveTable(c, c.destination, preset, base + i * gap, m, dur, 0.7));
+      midiNotes.forEach((m, i) => preset.start({note: m, time: base + i * gap, duration: dur, velocity: 90}));
     }
   }
 
@@ -545,12 +617,36 @@
 
     augOnlyNote:         { ua:'Визначення на слух обернень збільшеного тризвуку не проводиться, оскільки обернення енгармонічно рівні.',
                             en:'Identifying inversions of the augmented triad by ear is not practiced, because its inversions are enharmonically equal.' },
-    errBassSimultaneous: { ua:'Радимо обрати інший тембр або послідовне відтворення. В піснях бас-гітара зазвичай звучить в один голос, таке тренування буде більш ефективним. Відтворення інтервалів на акордів тембром бас-гітари в цій вправи не проводиться.',
+    errBassSimultaneous: { ua:'Радимо обрати інший тембр або послідовне відтворення. В піснях бас-гітара зазвичай звучить в один голос, таке тренування буде більш ефективним.',
                             en:'We recommend choosing another timbre or sequential playback. In songs the bass guitar usually plays a single line, so this kind of training will be more effective.' },
     triadTrainModeTitle: { ua:'Режим тренування', en:'Training mode' },
     triadModeTypeInv:    { ua:'тренувати тип тризвуку та обернення', en:'train chord type and inversion' },
     triadModeTypeOnly:   { ua:'тренувати лише тип тризвуку', en:'train chord type only' },
     summaryTimbre:       { ua:'тембр: ', en:'timbre: ' },
+    authorName:          { ua:'Катерина Кухарічева', en:'Kateryna Kukharicheva' },
+    contactBtn:          { ua:'Зворотний зв’язок', en:'Contact us' },
+    contactSubject:      { ua:'Камертон: відгук', en:'Kamerton: feedback' },
+    contactBodyIntro:    { ua:'Напишіть тут свій відгук або опишіть проблему:', en:'Write your feedback or describe the problem here:' },
+    contactDevice:       { ua:'Пристрій і браузер', en:'Device and browser' },
+    aboutSummary:        { ua:'Про проєкт', en:'About the project' },
+    aboutIntro:          { ua:'Камертон — тренажер для розвитку музичного слуху: інтервали, тризвуки та тембри.',
+                            en:'Kamerton is an ear training tool: intervals, triads and timbres.' },
+    aboutMission:        { ua:'Сайт є допоміжним інструментом до занять, дає можливість необмежено тренувати інтервали та тризвуки для покращення розпізнавання на слух.',
+                            en:'The site is a supplementary tool for lessons — it lets you practice intervals and triads without limits, to improve ear recognition.' },
+    aboutFree:           { ua:'Користування сайтом є безкоштовним.', en:'Using the site is free.' },
+    aboutAuthorCredit:   { ua:'Створено викладачкою Катериною Кухарічевою (теорія музики, сольфеджіо, фортепіано, клавішні).',
+                            en:'Created by music teacher Kateryna Kukharicheva (music theory, solfège, piano, keyboards).' },
+    aboutComponents:     { ua:'Сайт використовує відкриті компоненти та ліцензії:', en:'This site uses open components and licenses:' },
+    aboutEngine:         { ua:'Програвання звуку — бібліотека smplr (автор Daniel Gómez, danigb), ліцензія MIT:',
+                            en:'Sound playback uses the smplr library (by Daniel Gómez, danigb), MIT license:' },
+    aboutSounds:         { ua:'Звуки інструментів: SoundFont FluidR3 GM (автор Frank Wen), перетворений на окремі аудіофайли проєктом midi-js-soundfonts (gleitz), ліцензія Creative Commons Attribution 3.0.',
+                            en:'Instrument sounds: the FluidR3 GM SoundFont (by Frank Wen), rendered into audio files by the midi-js-soundfonts project (gleitz), licensed under Creative Commons Attribution 3.0.' },
+    aboutFonts:          { ua:'Шрифти Fraunces, Inter та IBM Plex Mono з Google Fonts, ліцензія SIL Open Font License:',
+                            en:'Fraunces, Inter and IBM Plex Mono fonts from Google Fonts, licensed under the SIL Open Font License:' },
+    aboutSynth:          { ua:'Синтезовані тембри створюються в браузері за допомогою Web Audio API.',
+                            en:'Synthesized timbres are generated in the browser using the Web Audio API.' },
+    soundHintMsg:        { ua:'Немає звуку? Перевірте, чи не ввімкнено беззвучний режим.', en:'No sound? Check that silent mode is off.' },
+    soundHintClose:      { ua:'Закрити', en:'Close' },
     seriesLenTitle:      { ua:'Кількість прикладів у серії', en:'Examples per series' },
     selectAllBtn:        { ua:'обрати всі', en:'select all' },
     clearAllBtn:         { ua:'очистити всі', en:'clear all' },
@@ -568,8 +664,8 @@
     waveformsHint:       { ua:'Цим звуком гратимуть приклади в "Інтервалах" і "Тризвуках".',
                             en:'This sound will be used to play examples in "Intervals" and "Triads".' },
     instrumentsTitle:    { ua:'Інструменти', en:'Instruments' },
-    instrumentsHint:     { ua:'Ноти завантажуються з відкритої бібліотеки WebAudioFont (вільна ліцензія, можна використовувати безкоштовно, зокрема для навчання). Потрібне інтернет-з’єднання під час завантаження.',
-                            en:'Notes are loaded from the open WebAudioFont library (free license, usable for free, including for teaching). Requires an internet connection while loading.' },
+    instrumentsHint:     { ua:'Ноти завантажуються з відкритих аудіобанків (бібліотека smplr і SoundFont FluidR3 GM, вільні ліцензії, можна використовувати безкоштовно, зокрема для навчання). Потрібне інтернет-з’єднання під час завантаження.',
+                            en:'Notes are loaded from open sound banks (the smplr library and the FluidR3 GM SoundFont, free licenses, usable for free, including for teaching). Requires an internet connection while loading.' },
     previewBtnTitle:     { ua:'Прослухати (висхідний мажорний тризвук)', en:'Preview (ascending major triad)' },
     loadingStageMsg:     { ua:'Завантажується тембр…', en:'Loading the sound…' },
 
@@ -669,6 +765,14 @@
   const scoreStreakLabel = document.getElementById('scoreStreakLabel');
   const resetScoreBtn = document.getElementById('resetScore');
   const footerTextEl = document.getElementById('footerText');
+  const soundHint = document.getElementById('soundHint');
+  const soundHintText = document.getElementById('soundHintText');
+  const soundHintClose = document.getElementById('soundHintClose');
+  const footerAuthorEl = document.getElementById('footerAuthor');
+  const contactBtnEl = document.getElementById('contactBtn');
+  const footerEmailEl = document.getElementById('footerEmail');
+  const aboutSummaryEl = document.getElementById('aboutSummary');
+  const aboutBodyEl = document.getElementById('aboutBody');
   const navModes = document.getElementById('navModes');
   const langSwitch = document.getElementById('langSwitch');
 
@@ -678,6 +782,61 @@
     scoreStreak.textContent = state.score.streak;
   }
 
+  // The address is assembled here (not written out in the HTML) so simple
+  // address-harvesting bots don't pick it up from the page source.
+  function contactEmail(){ return ['eartrainer.kt', 'gmail.com'].join('@'); }
+
+  function contactHref(){
+    const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+    const body = T('contactBodyIntro') + '\n\n\n' + T('contactDevice') + ': ' + ua;
+    return 'mailto:' + contactEmail() + '?subject=' + encodeURIComponent(T('contactSubject')) + '&body=' + encodeURIComponent(body);
+  }
+
+  function aboutBodyHtml(){
+    const link = (href, text) => '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(text || href) + '</a>';
+    return '<p>' + escapeHtml(T('aboutIntro')) + '</p>' +
+      '<p>' + escapeHtml(T('aboutMission')) + '</p>' +
+      '<p>' + escapeHtml(T('aboutFree')) + '</p>' +
+      '<p>' + escapeHtml(T('aboutAuthorCredit')) + '</p>' +
+      '<p>' + escapeHtml(T('aboutComponents')) + '</p>' +
+      '<ul>' +
+        '<li>' + escapeHtml(T('aboutEngine')) + ' ' + link('https://github.com/danigb/smplr', 'smplr') + '</li>' +
+        '<li>' + escapeHtml(T('aboutSounds')) + '</li>' +
+        '<li>' + escapeHtml(T('aboutFonts')) + ' ' + link('https://fonts.google.com', 'fonts.google.com') + '</li>' +
+      '</ul>' +
+      '<p>' + escapeHtml(T('aboutSynth')) + '</p>';
+  }
+
+  const SOUND_HINT_KEY = 'kamerton-sound-hint-dismissed';
+
+  function isTouchDevice(){
+    if(typeof window === 'undefined') return false;
+    if('ontouchstart' in window) return true;
+    if(typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) return true;
+    if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return true;
+    return false;
+  }
+
+  function soundHintDismissed(){
+    try{ return window.localStorage && localStorage.getItem(SOUND_HINT_KEY) === '1'; }
+    catch(e){ return false; }
+  }
+
+  function dismissSoundHint(){
+    soundHint.style.display = 'none';
+    try{ if(window.localStorage) localStorage.setItem(SOUND_HINT_KEY, '1'); }catch(e){}
+  }
+
+  // We cannot detect silent mode directly - the earliest useful moment is
+  // right after the person presses Play and (presumably) expects a sound.
+  let soundHintArmed = false;
+  function maybeShowSoundHint(){
+    if(!soundHintArmed || !isTouchDevice() || soundHintDismissed()) return;
+    soundHint.style.display = '';
+  }
+
+  soundHintClose.addEventListener('click', dismissSoundHint);
+
   function applyStaticTexts(){
     document.title = state.lang === 'en' ? 'Kamerton — Ear Training' : 'Камертон — тренування слуху';
     document.documentElement.lang = state.lang === 'en' ? 'en' : 'uk';
@@ -686,6 +845,14 @@
     scoreStreakLabel.textContent = T('scoreStreakLabel');
     resetScoreBtn.textContent = T('resetScoreBtn');
     footerTextEl.textContent = T('footerText');
+    soundHintText.textContent = T('soundHintMsg');
+    soundHintClose.setAttribute('aria-label', T('soundHintClose'));
+    footerAuthorEl.textContent = T('authorName');
+    contactBtnEl.textContent = T('contactBtn');
+    contactBtnEl.href = contactHref();
+    footerEmailEl.textContent = contactEmail();
+    aboutSummaryEl.textContent = T('aboutSummary');
+    aboutBodyEl.innerHTML = aboutBodyHtml();
     soundInfo.textContent = T('soundInfoText');
     playBtn.title = T('playBtnTitle');
     replayBtn.textContent = T('replayBtn');
@@ -1384,6 +1551,8 @@
   }
 
   playBtn.addEventListener('click', ()=>{
+    soundHintArmed = true;
+    maybeShowSoundHint();
     if(!state.current){ startRound(); }
     else { playCurrent(); }
   });
@@ -1439,11 +1608,13 @@
       chordVoicing, midiToFreq, intervalRootRange, pickIntervalRootMidi,
       SEQ_GAP_SYNTH, SEQ_DUR_SYNTH, SEQ_GAP_LIB, SEQ_DUR_LIB,
       ensureCtx, state,
-      loadedInstruments, ensureWafPlayer, playLibrarySequence, previewSound, playSynthSequence,
+      loadedInstruments, ensureSoundEngine, playLibrarySequence, previewSound, playSynthSequence,
       queueLoadInstrument, notifyInstrumentReady, startRound, resetSeries,
       UI, T, L, applyLanguage, labelFor, modeLabel, buildSummaryText,
       handleAnswer, triadAnswerCombos, renderSummaryPanel, entryTimbreLabel,
-      onlyAugmentedSelected, selectedOnlyBass, promptEl
+      onlyAugmentedSelected, selectedOnlyBass, promptEl,
+      contactHref, contactEmail, aboutBodyHtml,
+      isTouchDevice, maybeShowSoundHint, dismissSoundHint, soundHintDismissed, soundHint, playBtn
     };
   }
 })();
