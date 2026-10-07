@@ -226,6 +226,25 @@
   .summary-user{ font-family:'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); flex-basis: 100%; }
   .summary .next-btn{ margin-top: 6px; }
   .summary-actions{ display:flex; align-items:center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  nav.modes button.teacher-only{ display:none; }
+  body.teacher nav.modes button.teacher-only{ display:block; }
+  body.student nav.modes, body.student #settingsPanel{ display:none; }
+  body.student .layout, body.student .layout.wide-panel{ grid-template-columns: minmax(0, 1fr); }
+  .task-banner{ font-family:'Fraunces', serif; font-size: 17px; color: var(--accent); text-align:center; }
+  .task-panel h2{ margin-top: 0; }
+  .task-panel .field{ margin: 0 0 14px; }
+  .task-panel label.lbl{ display:block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .task-panel textarea.num-input{ resize: vertical; font-size: 12.5px; }
+  .task-panel ul.task-sum{ margin: 0 0 8px; padding-left: 18px; font-size: 13px; line-height: 1.55; color: var(--text); }
+  .task-panel .task-status{ font-size: 12.5px; margin: 6px 0 0; color: var(--muted); }
+  .task-panel .task-status.ok{ color: var(--good); }
+  .task-panel .task-status.bad{ color: var(--accent); }
+  .task-panel details{ font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.55; }
+  .task-panel details summary{ cursor:pointer; }
+  .task-panel .task-btns{ display:flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items:center; }
+  .send-box{ margin-bottom: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--panel-line); }
+  .send-box label{ display:block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .send-box .hint{ margin: 8px 0 0; max-width: none; text-align:left; }
   .ghost-btn{
     font-family:'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted); background:none;
     border: 1px solid var(--panel-line); padding: 8px 14px; border-radius: 8px; cursor: pointer;
@@ -263,7 +282,7 @@
 <div class="wrap">
 
   <header class="top">
-    <div class="brand">
+    <div class="brand" id="brand">
       <span class="fork">🎵</span>
       <h1>Камертон</h1>
       <span class="tag" id="brandTag">тренування слуху</span>
@@ -285,12 +304,14 @@
     <button data-mode="timbre">Тембри</button>
     <button data-mode="sound">Звук</button>
     <button data-mode="range">Діапазон</button>
+    <button class="teacher-only" data-mode="task">Завдання</button>
   </nav>
 
   <div class="layout" id="layoutGrid">
     <div class="panel" id="settingsPanel"></div>
 
     <div class="stage">
+      <div class="task-banner" id="taskBanner" style="display:none;"></div>
       <div class="series-progress" id="seriesProgress"></div>
 
       <div id="stageContent">
@@ -336,7 +357,7 @@
 (function(){
 
   // Shown, barely visible, at the bottom of the page. Raise it with every release.
-  const APP_VERSION = '2.0';
+  const APP_VERSION = '2.1';
   document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
   // ---------- synth audio engine ----------
@@ -756,6 +777,42 @@
     navTimbre:           { ua:'Тембри', en:'Timbres' },
     navSound:            { ua:'Звук', en:'Sound' },
     navRange:            { ua:'Діапазон', en:'Range' },
+    navTask:             { ua:'Завдання', en:'Task' },
+    taskInfoText:        { ua:'Тут ви складаєте завдання для учня: обираєте налаштування, копіюєте посилання й надсилаєте його. Учень побачить лише саму вправу, без налаштувань.',
+                            en:'Here you build a task for a student: pick the settings, copy the link and send it. The student sees only the exercise, without any settings.' },
+    taskTitle:           { ua:'Завдання для учня', en:'Task for a student' },
+    taskNameLabel:       { ua:'Назва завдання (її побачить учень)', en:'Task name (the student will see it)' },
+    taskNamePh:          { ua:'наприклад: Інтервали, тиждень 3', en:'for example: Intervals, week 3' },
+    taskSectionTitle:    { ua:'Розділ завдання', en:'Task section' },
+    taskContains:        { ua:'У завдання потраплять поточні налаштування:', en:'The task will contain the current settings:' },
+    taskSettingsHint:    { ua:'Налаштування беруться з вкладок «Інтервали», «Тризвуки», «Тембри», «Звук» і «Діапазон». Змініть їх там і поверніться сюди: посилання оновиться.',
+                            en:'The settings come from the Intervals, Triads, Timbres, Sound and Range tabs. Change them there and come back: the link will update.' },
+    taskSumLen:          { ua:'Прикладів у серії: ', en:'Examples per series: ' },
+    taskSumIntervals:    { ua:'Інтервали: ', en:'Intervals: ' },
+    taskSumDirs:         { ua:'Спосіб відтворення: ', en:'Playback: ' },
+    taskSumTriads:       { ua:'Тризвуки: ', en:'Triads: ' },
+    taskSumInv:          { ua:'Обернення: ', en:'Inversions: ' },
+    taskSumTimbres:      { ua:'Тембри: ', en:'Timbres: ' },
+    taskSumInstr:        { ua:'Інструменти: ', en:'Instruments: ' },
+    taskSumWaves:        { ua:'Синтезовані хвилі: ', en:'Synthesized waves: ' },
+    taskSumRanges:       { ua:'Діапазони: ', en:'Ranges: ' },
+    taskFormTitle:       { ua:'Google-форма для результатів', en:'Google Form for results' },
+    taskFormOk:          { ua:'✓ Форму підключено', en:'✓ Form connected' },
+    taskFormNone:        { ua:'Форму не підключено: учень зможе лише скопіювати або зберегти результат.', en:'No form connected: the student can only copy or save the result.' },
+    taskFormBad:         { ua:'Це не схоже на посилання Google-форми (має починатися з docs.google.com/forms/).', en:'This does not look like a Google Form link (it should start with docs.google.com/forms/).' },
+    taskFormNoEntries:   { ua:'У посиланні немає заповнених полів. Впишіть у поля числа 1–5 (див. інструкцію нижче).', en:'The link has no pre-filled fields. Type the numbers 1–5 into the fields (see the instructions below).' },
+    taskFormPh:          { ua:'Вставте сюди попередньо заповнене посилання', en:'Paste the pre-filled link here' },
+    taskFormHowSummary:  { ua:'Як підключити форму', en:'How to connect the form' },
+    taskFormHowHtml:     { ua:'<ol><li>Відкрийте форму для редагування, натисніть «⋮» → «Отримати попередньо заповнене посилання».</li><li>Впишіть у поля за порядком числа: ім’я та прізвище — <b>1</b>, завдання — <b>2</b>, результат правильних — <b>3</b>, результат всього — <b>4</b>, деталі відповідей — <b>5</b>.</li><li>Натисніть «Отримати посилання», скопіюйте його й вставте вище. Це потрібно зробити один раз.</li></ol>Посилання має починатися з docs.google.com/forms/, а не з forms.gle.',
+                            en:'<ol><li>Open the form for editing and press "⋮" → "Get pre-filled link".</li><li>Type numbers into the fields in order: name — <b>1</b>, task — <b>2</b>, correct — <b>3</b>, total — <b>4</b>, answer details — <b>5</b>.</li><li>Press "Get link", copy it and paste it above. You only need to do this once.</li></ol>The link must start with docs.google.com/forms/, not forms.gle.' },
+    taskLinkTitle:       { ua:'Посилання для учня', en:'Link for the student' },
+    taskCopyBtn:         { ua:'Копіювати посилання', en:'Copy link' },
+    taskOpenBtn:         { ua:'Відкрити як учень', en:'Open as a student' },
+    taskBannerPrefix:    { ua:'Завдання: ', en:'Task: ' },
+    sendNameLabel:       { ua:'Ім’я та прізвище', en:'Full name' },
+    sendBtn:             { ua:'Надіслати результат викладачці', en:'Send the result to the teacher' },
+    sendHint:            { ua:'Відкриється форма з уже заповненими відповідями. Перевірте їх і натисніть «Надіслати».', en:'A form opens with the answers already filled in. Check them and press "Submit".' },
+    sendNeedName:        { ua:'Спершу введіть ім’я та прізвище.', en:'Please enter your full name first.' },
     rangeTitle:          { ua:'Діапазони звучання', en:'Pitch ranges' },
     rangeHint:           { ua:'Можна обрати кілька діапазонів: кожен приклад береться з одного з них навмання. Усі ноти прикладу лежать у межах цього діапазону. Бас-гітара завжди звучить у діапазоні E1–G3. Звуки кожного діапазону завантажуються окремо: спершу вибрані, решта підвантажується у фоні, тож перемикатися потім можна без очікування.',
                             en:'You can tick several ranges: each example comes from one of them at random, and every note of the example lies within that range. The bass guitar always plays within E1–G3. The sounds of each range are downloaded separately: the ticked ones first, the others quietly in the background, so switching later needs no waiting.' },
@@ -1011,13 +1068,13 @@
     footerEmailEl.textContent = contactEmail();
     aboutSummaryEl.textContent = T('aboutSummary');
     aboutBodyEl.innerHTML = aboutBodyHtml();
-    soundInfo.textContent = T('soundInfoText');
+    soundInfo.textContent = state.mode === 'task' ? T('taskInfoText') : T('soundInfoText');
     playBtn.title = T('playBtnTitle');
     replayBtn.textContent = T('replayBtn');
     resetSeriesBtn.title = T('resetSeriesBtnTitle');
     resetSeriesBtn.textContent = T('resetSeriesBtn');
 
-    const navKeyByMode = { intervals:'navIntervals', triads:'navTriads', timbre:'navTimbre', sound:'navSound', range:'navRange' };
+    const navKeyByMode = { intervals:'navIntervals', triads:'navTriads', timbre:'navTimbre', sound:'navSound', range:'navRange', task:'navTask' };
     navModes.querySelectorAll('button[data-mode]').forEach(btn=>{
       btn.textContent = T(navKeyByMode[btn.dataset.mode]);
     });
@@ -1083,6 +1140,8 @@
   // ---------- settings panel rendering ----------
   function renderSettings(){
     settingsPanel.innerHTML = '';
+
+    if(state.mode === 'task'){ renderTaskPanel(); return; }
 
     if(state.mode !== 'sound' && state.mode !== 'range'){
       settingsPanel.appendChild(buildSeriesLengthControl());
@@ -1690,11 +1749,29 @@
       '<button class="ghost-btn" id="copySummaryBtn" type="button">' + escapeHtml(T('copyResultBtn')) + '</button>' +
       '<span class="summary-msg" id="summaryMsg"></span>' +
       '</div>';
+    const sendForm = (state.task && currentForm() && currentForm().e) ? currentForm() : null;
+    if(sendForm){
+      html += '<div class="send-box"><label for="studentName">' + escapeHtml(T('sendNameLabel')) + '</label>' +
+        '<input class="num-input" id="studentName" type="text" maxlength="80" autocomplete="name" value="' + escapeHtml(lsGet(NAME_STORE) || '') + '">' +
+        '<button class="next-btn show" id="sendFormBtn" type="button" style="margin-top:12px;">' + escapeHtml(T('sendBtn')) + '</button>' +
+        '<p class="hint" id="sendHint">' + escapeHtml(T('sendHint')) + '</p></div>';
+    }
     html += '<button class="next-btn show" id="newSeriesBtn" type="button">' + escapeHtml(T('newSeriesBtn')) + '</button>';
     summaryPanel.innerHTML = html;
 
     document.getElementById('saveSummaryBtn').addEventListener('click', saveSummary);
     document.getElementById('copySummaryBtn').addEventListener('click', ()=> copySummary(document.getElementById('summaryMsg')));
+    if(sendForm){
+      const nameEl = document.getElementById('studentName');
+      nameEl.addEventListener('input', ()=> lsSet(NAME_STORE, nameEl.value));
+      document.getElementById('sendFormBtn').addEventListener('click', ()=>{
+        const nm = nameEl.value.trim();
+        if(!nm){ document.getElementById('sendHint').textContent = T('sendNeedName'); nameEl.focus(); return; }
+        lsSet(NAME_STORE, nm);
+        const url = buildFormUrl(nm);
+        if(url) window.open(url, '_blank');
+      });
+    }
     document.getElementById('newSeriesBtn').addEventListener('click', ()=>{
       resetSeries();
       startRound();
@@ -1726,6 +1803,337 @@
     seriesProgress.textContent = '';
   }
 
+  // ---------- teacher mode: task links ----------
+  // A task is the current settings packed into the address after '#'. The
+  // student opens that link, sees only the exercise, and at the end sends the
+  // result to a Google Form whose fields are pre-filled. No server involved.
+  // Teacher mode is switched on by tapping the logo 5 times (or by opening
+  // the page with #teacher at the end of the address).
+
+  // Optionally bake the form in here: { id:'1FAIpQL...', e:['111','222','333','444','555'] }
+  // (ids of the fields: name, task, correct, total, details). Otherwise the
+  // teacher pastes a pre-filled link once in the "Task" tab.
+  const FORM_DEFAULT = null;
+  const FORM_STORE = 'kamerton_form', NAME_STORE = 'kamerton_student_name';
+  const taskBannerEl = document.getElementById('taskBanner');
+  const brandEl = document.getElementById('brand');
+
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+
+  state.task = null;           // set when the page was opened from a task link (student view)
+  state.taskName = '';
+  state.taskSection = 'intervals';
+  state.form = null;           // form pasted by the teacher: { id, e:[5 entry ids] }
+
+  function currentForm(){
+    if(state.task) return state.task.form || null;
+    return state.form || FORM_DEFAULT;
+  }
+
+  // "...viewform?entry.111=1&entry.222=2..." -> { id, e:['111','222',...] }
+  // Returns null if it is not a Google Form link; e is null if fields are missing.
+  function parseFormLink(text){
+    const str = String(text || '');
+    const m = /\/forms\/d\/e\/([A-Za-z0-9_-]+)\//.exec(str);
+    if(!m) return null;
+    const e = [];
+    (str.split('?')[1] || '').split('#')[0].split('&').forEach(part => {
+      const kv = /^entry\.(\d+)=(.*)$/.exec(part);
+      if(!kv) return;
+      let v = kv[2];
+      try{ v = decodeURIComponent(v.replace(/\+/g, ' ')); }catch(err){}
+      const idx = parseInt(v, 10);
+      if(idx >= 1 && idx <= 5 && String(idx) === v.trim()) e[idx - 1] = kv[1];
+    });
+    for(let i = 0; i < 5; i++){ if(!e[i]) return { id: m[1], e: null }; }
+    return { id: m[1], e: e };
+  }
+
+  function readParams(hash){
+    const out = {};
+    String(hash || '').replace(/^#/, '').split('&').forEach(part => {
+      if(!part) return;
+      const i = part.indexOf('=');
+      const k = i < 0 ? part : part.slice(0, i);
+      let v = i < 0 ? '' : part.slice(i + 1);
+      try{ v = decodeURIComponent(v.replace(/\+/g, ' ')); }catch(err){}
+      out[k] = v;
+    });
+    return out;
+  }
+
+  // key in the link -> [the set in state, all valid items]
+  function taskSets(){
+    return {
+      iv:  [state.enabled.intervals,   INTERVALS],
+      dir: [state.enabled.direction,   DIRECTIONS],
+      tr:  [state.enabled.triads,      TRIADS],
+      inv: [state.enabled.inversions,  TRIAD_INVERSIONS],
+      cs:  [state.enabled.chordStyle,  CHORD_STYLES],
+      tm:  [state.enabled.timbre,      TIMBRES],
+      wf:  [state.enabled.waveforms,   TIMBRES],
+      'in':[state.enabled.instruments, INSTRUMENTS],
+      rg:  [state.ranges,              RANGES]
+    };
+  }
+
+  function buildTaskLink(){
+    const parts = [];
+    const add = (k, v) => parts.push(k + '=' + encodeURIComponent(v).replace(/%2C/g, ','));
+    add('mode', state.taskSection);
+    if(state.taskName.trim()) add('n', state.taskName.trim());
+    add('len', state.seriesLength);
+    add('tam', state.triadAnswerMode);
+    add('eng', state.soundEngine);
+    add('lg', state.lang);
+    const sets = taskSets();
+    Object.keys(sets).forEach(k => add(k, Array.from(sets[k][0]).join(',')));
+    const f = currentForm();
+    if(f && f.e){ add('f', f.id); add('fe', f.e.join('.')); }
+    return String(location.href).split('#')[0] + '#' + parts.join('&');
+  }
+
+  // Apply a task from the link's parameters. Returns false if there is none.
+  function applyTaskParams(p){
+    if(['intervals', 'triads', 'timbre'].indexOf(p.mode) < 0) return false;
+    state.mode = p.mode;
+    state.taskSection = p.mode;
+    const len = parseInt(p.len, 10);
+    if(len >= 3 && len <= 36) state.seriesLength = len;
+    if(p.tam === 'type_inv' || p.tam === 'type_only') state.triadAnswerMode = p.tam;
+    if(p.eng === 'library' || p.eng === 'synth') state.soundEngine = p.eng;
+    if(p.lg === 'en' || p.lg === 'ua') state.lang = p.lg;
+    const sets = taskSets();
+    Object.keys(sets).forEach(k => {
+      if(p[k] === undefined) return;
+      const valid = new Set(sets[k][1].map(x => x.code));
+      const codes = p[k].split(',').filter(c => valid.has(c));
+      if(codes.length === 0) return;          // an empty choice makes no task: keep the default
+      sets[k][0].clear();
+      codes.forEach(c => sets[k][0].add(c));
+    });
+    let form = null;
+    if(p.f && /^[A-Za-z0-9_-]+$/.test(p.f) && p.fe){
+      const e = p.fe.split('.');
+      if(e.length === 5 && e.every(x => /^\d+$/.test(x))) form = { id: p.f, e: e };
+    }
+    state.task = { name: p.n || '', form: form };
+    return true;
+  }
+
+  function setTeacher(on){
+    document.body.classList.toggle('teacher', !!on);
+    if(!on && state.mode === 'task'){
+      const first = navModes.querySelector('button[data-mode="intervals"]');
+      if(first) first.click();
+    }
+  }
+
+  function initTask(){
+    const p = readParams(location.hash);
+    const stored = lsGet(FORM_STORE);
+    if(stored){ try{ const f = JSON.parse(stored); if(f && f.id && f.e && f.e.length === 5) state.form = f; }catch(e){} }
+    if(p.teacher !== undefined) setTeacher(true);
+    if(applyTaskParams(p)){
+      document.body.classList.add('student');
+      document.body.classList.remove('teacher');
+      navModes.querySelectorAll('button[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === state.mode));
+      if(state.task.name){
+        taskBannerEl.style.display = '';
+        taskBannerEl.textContent = T('taskBannerPrefix') + state.task.name;
+      }
+    }
+  }
+
+  let brandTaps = [];
+  brandEl.addEventListener('click', () => {
+    if(state.task) return;
+    const now = Date.now();
+    brandTaps = brandTaps.filter(t => now - t < 3000);
+    brandTaps.push(now);
+    if(brandTaps.length >= 5){
+      brandTaps = [];
+      setTeacher(!document.body.classList.contains('teacher'));
+    }
+  });
+
+  // What the task will contain, as readable lines (shown to the teacher).
+  function taskSummaryLines(){
+    const names = (items, set) => {
+      const picked = items.filter(x => set.has(x.code));
+      return picked.length === items.length && items.length > 3 ? (state.lang === 'en' ? 'all' : 'усі') : picked.map(L).join(', ');
+    };
+    const lines = [];
+    const sec = state.taskSection;
+    lines.push(T(sec === 'intervals' ? 'navIntervals' : sec === 'triads' ? 'navTriads' : 'navTimbre'));
+    if(sec !== 'timbre') lines.push(T('taskSumLen') + state.seriesLength);
+    if(sec === 'intervals'){
+      lines.push(T('taskSumIntervals') + names(INTERVALS, state.enabled.intervals));
+      lines.push(T('taskSumDirs') + names(DIRECTIONS, state.enabled.direction));
+    } else if(sec === 'triads'){
+      lines.push(T('taskSumTriads') + names(TRIADS, state.enabled.triads));
+      lines.push(T('taskSumInv') + (state.triadAnswerMode === 'type_only' ? T('triadModeTypeOnly') : names(TRIAD_INVERSIONS, state.enabled.inversions)));
+      lines.push(T('taskSumDirs') + names(CHORD_STYLES, state.enabled.chordStyle));
+    } else {
+      lines.push(T('taskSumTimbres') + names(TIMBRES, state.enabled.timbre));
+    }
+    if(sec !== 'timbre'){
+      if(state.soundEngine === 'synth') lines.push(T('taskSumWaves') + names(TIMBRES, state.enabled.waveforms));
+      else lines.push(T('taskSumInstr') + names(INSTRUMENTS, state.enabled.instruments));
+      lines.push(T('taskSumRanges') + RANGES.filter(r => state.ranges.has(r.code)).map(L).join('; '));
+    }
+    return lines;
+  }
+
+  function renderTaskPanel(){
+    const box = document.createElement('div');
+    box.className = 'task-panel';
+    settingsPanel.appendChild(box);
+
+    const h = document.createElement('h2');
+    h.textContent = T('taskTitle');
+    box.appendChild(h);
+
+    // name
+    const nameWrap = document.createElement('div');
+    nameWrap.className = 'field';
+    nameWrap.innerHTML = '<label class="lbl" for="taskName">' + escapeHtml(T('taskNameLabel')) + '</label>';
+    const nameIn = document.createElement('input');
+    nameIn.type = 'text'; nameIn.id = 'taskName'; nameIn.className = 'num-input'; nameIn.maxLength = 80;
+    nameIn.placeholder = T('taskNamePh');
+    nameIn.value = state.taskName;
+    nameWrap.appendChild(nameIn);
+    box.appendChild(nameWrap);
+
+    // section
+    box.appendChild(buildRadio(T('taskSectionTitle'), [
+      {v:'intervals', l:UI.navIntervals.ua, en:UI.navIntervals.en},
+      {v:'triads',    l:UI.navTriads.ua,    en:UI.navTriads.en},
+      {v:'timbre',    l:UI.navTimbre.ua,    en:UI.navTimbre.en}
+    ], state.taskSection, v => { state.taskSection = v; renderSettings(); }));
+    box.appendChild(divider());
+
+    // what is inside
+    const sumTitle = document.createElement('p');
+    sumTitle.className = 'lbl';
+    sumTitle.style.cssText = 'font-size:12.5px;color:var(--muted);margin:0 0 6px;';
+    sumTitle.textContent = T('taskContains');
+    box.appendChild(sumTitle);
+    const ul = document.createElement('ul');
+    ul.className = 'task-sum';
+    ul.innerHTML = taskSummaryLines().map(x => '<li>' + escapeHtml(x) + '</li>').join('');
+    box.appendChild(ul);
+    const sh = document.createElement('p');
+    sh.className = 'hint';
+    sh.style.cssText = 'text-align:left;max-width:none;margin:0 0 4px;';
+    sh.textContent = T('taskSettingsHint');
+    box.appendChild(sh);
+    box.appendChild(divider());
+
+    // form
+    const fh = document.createElement('h2');
+    fh.textContent = T('taskFormTitle');
+    box.appendChild(fh);
+    const status = document.createElement('p');
+    status.className = 'task-status';
+    const setStatus = () => {
+      const f = currentForm();
+      status.className = 'task-status ' + (f && f.e ? 'ok' : '');
+      status.textContent = f && f.e ? T('taskFormOk') : T('taskFormNone');
+    };
+    if(!FORM_DEFAULT){
+      const ta = document.createElement('textarea');
+      ta.className = 'num-input'; ta.rows = 3; ta.placeholder = T('taskFormPh');
+      ta.addEventListener('input', () => {
+        const r = parseFormLink(ta.value);
+        if(!r){
+          status.className = 'task-status bad';
+          status.textContent = ta.value.trim() ? T('taskFormBad') : '';
+          if(!ta.value.trim()) setStatus();
+        } else if(!r.e){
+          status.className = 'task-status bad';
+          status.textContent = T('taskFormNoEntries');
+        } else {
+          state.form = r;
+          lsSet(FORM_STORE, JSON.stringify(r));
+          setStatus();
+        }
+        updateLink();
+      });
+      box.appendChild(ta);
+    }
+    box.appendChild(status);
+    if(!FORM_DEFAULT){
+      const det = document.createElement('details');
+      det.innerHTML = '<summary>' + escapeHtml(T('taskFormHowSummary')) + '</summary>' + T('taskFormHowHtml');
+      box.appendChild(det);
+    }
+    box.appendChild(divider());
+
+    // link
+    const lh = document.createElement('h2');
+    lh.textContent = T('taskLinkTitle');
+    box.appendChild(lh);
+    const linkIn = document.createElement('input');
+    linkIn.type = 'text'; linkIn.readOnly = true; linkIn.className = 'num-input'; linkIn.id = 'taskLink';
+    linkIn.addEventListener('focus', () => { try{ linkIn.select(); }catch(e){} });
+    box.appendChild(linkIn);
+    const btns = document.createElement('div');
+    btns.className = 'task-btns';
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button'; copyBtn.className = 'ghost-btn'; copyBtn.textContent = T('taskCopyBtn');
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button'; openBtn.className = 'ghost-btn'; openBtn.textContent = T('taskOpenBtn');
+    const msg = document.createElement('span');
+    msg.className = 'summary-msg';
+    btns.appendChild(copyBtn); btns.appendChild(openBtn); btns.appendChild(msg);
+    box.appendChild(btns);
+
+    function updateLink(){ linkIn.value = buildTaskLink(); }
+    nameIn.addEventListener('input', () => { state.taskName = nameIn.value; updateLink(); });
+    copyBtn.addEventListener('click', () => {
+      updateLink();
+      const text = linkIn.value;
+      const done = () => { msg.textContent = T('copiedMsg'); setTimeout(() => { msg.textContent = ''; }, 2000); };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(() => { fallbackCopy(text); done(); });
+      } else { fallbackCopy(text); done(); }
+    });
+    openBtn.addEventListener('click', () => { updateLink(); window.open(linkIn.value, '_blank'); });
+    setStatus();
+    updateLink();
+  }
+
+  // The form link carries the result: name, task, correct, total, details.
+  function detailLines(wrongOnly){
+    return state.seriesLog.map((e, i) => {
+      const t = entryTargetLabel(e);
+      if(e.correct) return wrongOnly ? null : (i + 1) + '. ' + t + ' ✓';
+      return (i + 1) + '. ' + t + ' ✗ (' + T('summaryYourAnswer') + entryUserLabel(e) + ')';
+    }).filter(Boolean);
+  }
+
+  function buildFormUrl(name){
+    const f = currentForm();
+    if(!f || !f.e) return null;
+    const correct = state.seriesLog.filter(l => l.correct).length;
+    const taskText = (state.task && state.task.name ? state.task.name + ' — ' : '') + modeLabel();
+    const enc = encodeURIComponent;
+    const base = 'https://docs.google.com/forms/d/e/' + f.id + '/viewform?usp=pp_url'
+      + '&entry.' + f.e[0] + '=' + enc(name)
+      + '&entry.' + f.e[1] + '=' + enc(taskText)
+      + '&entry.' + f.e[2] + '=' + correct
+      + '&entry.' + f.e[3] + '=' + state.seriesLog.length
+      + '&entry.' + f.e[4] + '=';
+    const head = T('summaryDate') + new Date().toLocaleString(state.lang === 'en' ? 'en-US' : 'uk-UA') + '\n';
+    const LIMIT = 7000;                     // keep the address within what browsers/Google accept
+    let det = head + detailLines(false).join('\n');
+    if((base + enc(det)).length > LIMIT) det = head + detailLines(true).join('\n');
+    while(det.length > 20 && (base + enc(det)).length > LIMIT) det = det.slice(0, Math.floor(det.length * 0.9));
+    return base + enc(det);
+  }
+
   playBtn.addEventListener('click', ()=>{
     soundHintArmed = true;
     maybeShowSoundHint();
@@ -1747,11 +2155,12 @@
       btn.classList.add('active');
       state.mode = btn.dataset.mode;
       renderSettings();
-      layoutGrid.classList.toggle('wide-panel', state.mode === 'sound');
-      if(state.mode === 'sound' || state.mode === 'range'){
+      layoutGrid.classList.toggle('wide-panel', state.mode === 'sound' || state.mode === 'task');
+      if(state.mode === 'sound' || state.mode === 'range' || state.mode === 'task'){
         stageContent.style.display = 'none';
         summaryPanel.style.display = 'none';
-        soundInfo.style.display = state.mode === 'sound' ? '' : 'none';
+        soundInfo.style.display = (state.mode === 'sound' || state.mode === 'task') ? '' : 'none';
+        soundInfo.textContent = state.mode === 'task' ? T('taskInfoText') : T('soundInfoText');
         seriesProgress.textContent = '';
         state.current = null;
       } else {
@@ -1761,6 +2170,7 @@
     });
   });
 
+  initTask();
   applyStaticTexts();
   renderSettings();
   renderScore();
@@ -1793,6 +2203,7 @@
       onlyAugmentedSelected, selectedOnlyBass, promptEl,
       contactHref, contactEmail, aboutBodyHtml,
       APP_VERSION, startSilentKeepAlive, IS_IOS,
+      readParams, parseFormLink, buildTaskLink, buildFormUrl, applyTaskParams, setTeacher, taskSummaryLines, currentForm,
       isTouchDevice, maybeShowSoundHint, dismissSoundHint, soundHintDismissed, soundHint, playBtn
     };
   }
