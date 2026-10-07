@@ -335,40 +335,34 @@
 
   // ---------- synth audio engine ----------
   let ctx = null;
-  function ensureCtx(){
-    requestPlaybackSession();
-    if(!ctx || ctx.state === 'closed'){ ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-    if(ctx.state === 'suspended'){ ctx.resume(); }
-    return ctx;
-  }
 
   // iOS puts Web Audio in the "ambient" session, which the silent switch mutes.
-  // Asking for a "playback" session makes the page sound like a media player.
-  // Safari 17+ exposes navigator.audioSession; older iOS switches the session
-  // once an <audio> element plays, so a looping silent clip is used there.
+  // Newer iOS honours navigator.audioSession; iOS 18 and earlier ignore it for
+  // Web Audio and only switch to playback while an <audio> element is playing,
+  // so a looping silent clip is started from the user's tap on iOS.
+  try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+
+  const IS_IOS = /iP(hone|od|ad)/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
   let silentKeepAlive = null;
-  function isIOS(){
-    if(typeof navigator === 'undefined') return false;
-    return /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }
-  function requestPlaybackSession(){
-    try{
-      if(navigator.audioSession){ navigator.audioSession.type = 'playback'; return; }
-    }catch(e){}
-    if(silentKeepAlive || !isIOS() || typeof Audio === 'undefined') return;   // <audio> trick only on iPhone/iPad
+  function startSilentKeepAlive(){
+    if(!IS_IOS || silentKeepAlive) return;
     silentKeepAlive = new Audio(SILENT_WAV);
     silentKeepAlive.loop = true;
     silentKeepAlive.setAttribute('playsinline', '');
+    silentKeepAlive.setAttribute('x-webkit-airplay', 'deny');
     const p = silentKeepAlive.play();
     if(p && p.catch) p.catch(function(){ silentKeepAlive = null; });
   }
+  ['touchend', 'click'].forEach(function(type){
+    document.addEventListener(type, startSilentKeepAlive, true);
+  });
   document.addEventListener('visibilitychange', function(){
     if(document.hidden && silentKeepAlive){ silentKeepAlive.pause(); silentKeepAlive = null; }
   });
 
   function ensureCtx(){
-    requestPlaybackSession();
     if(!ctx || ctx.state === 'closed'){ ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     if(ctx.state === 'suspended'){ ctx.resume(); }
     return ctx;
@@ -1792,7 +1786,7 @@
       handleAnswer, triadAnswerCombos, renderSummaryPanel, entryTimbreLabel,
       onlyAugmentedSelected, selectedOnlyBass, promptEl,
       contactHref, contactEmail, aboutBodyHtml,
-      requestPlaybackSession, isIOS,
+      startSilentKeepAlive, IS_IOS,
       isTouchDevice, maybeShowSoundHint, dismissSoundHint, soundHintDismissed, soundHint, playBtn
     };
   }
