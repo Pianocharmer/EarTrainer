@@ -235,6 +235,7 @@
 
   footer{ text-align:center; color: var(--muted-2); font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; margin-top: 34px; }
   footer p{ margin: 0; }
+  .app-version{ margin-top: 14px; font-size: 10px; letter-spacing: 0.4px; opacity: 0.45; user-select: text; }
   .footer-contact{ display:flex; flex-wrap: wrap; justify-content:center; align-items:center; gap: 10px 16px; margin-top: 18px; }
   .footer-author{ font-family:'Fraunces', serif; font-size: 15px; color: var(--muted); }
   .contact-btn{
@@ -327,11 +328,16 @@
       <summary id="aboutSummary">Про проєкт</summary>
       <div class="about-body" id="aboutBody"></div>
     </details>
+    <p class="app-version" id="appVersion"></p>
   </footer>
 </div>
 
 <script>
 (function(){
+
+  // Shown, barely visible, at the bottom of the page. Raise it with every release.
+  const APP_VERSION = '2.0';
+  document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
   // ---------- synth audio engine ----------
   let ctx = null;
@@ -1786,7 +1792,7 @@
       handleAnswer, triadAnswerCombos, renderSummaryPanel, entryTimbreLabel,
       onlyAugmentedSelected, selectedOnlyBass, promptEl,
       contactHref, contactEmail, aboutBodyHtml,
-      startSilentKeepAlive, IS_IOS,
+      APP_VERSION, startSilentKeepAlive, IS_IOS,
       isTouchDevice, maybeShowSoundHint, dismissSoundHint, soundHintDismissed, soundHint, playBtn
     };
   }
