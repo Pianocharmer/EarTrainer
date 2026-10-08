@@ -11,6 +11,7 @@ For every instrument except the bass guitar three files are written, one per tra
   <name>_low-mp3.js   C1-B3   (24-59)  -> notes 22-61
   <name>_mid-mp3.js   E3-G5   (52-79)  -> notes 50-81
   <name>_high-mp3.js  G4-C7   (67-96)  -> notes 65-98
+Choir/voice instruments (MID_ONLY) get the _mid file only.
 The bass guitar always plays E1-G3 (28-55), so it gets one file with notes 26-57.
 Inside each file the JavaScript variable is renamed to match the file name, because the
 local (file://) loader looks the data up by file name. Samples themselves are not changed.
@@ -23,6 +24,8 @@ def midi(name):
     n = NOTES[m.group(1)] + (1 if m.group(2)=='#' else -1 if m.group(2)=='b' else 0)
     return 12*(int(m.group(3))+1) + n
 RANGES = {'low': (22, 61), 'mid': (50, 81), 'high': (65, 98)}
+# Voices and the pad (choir / voice / pad) are offered in the middle range only, so only the _mid file is made.
+MID_ONLY = {'choir_aahs', 'voice_oohs', 'pad_2_warm'}
 BASS = 'electric_bass_finger'; BASS_RANGE = (26, 57)
 src, dst = sys.argv[1], sys.argv[2]
 os.makedirs(dst, exist_ok=True)
@@ -42,4 +45,6 @@ for f in sorted(os.listdir(src)):
     name = f[:-7]
     if name == BASS: write(name, name, *BASS_RANGE)
     else:
-        for rid, (lo, hi) in RANGES.items(): write(name, name + '_' + rid, lo, hi)
+        for rid, (lo, hi) in RANGES.items():
+            if name in MID_ONLY and rid != 'mid': continue
+            write(name, name + '_' + rid, lo, hi)
