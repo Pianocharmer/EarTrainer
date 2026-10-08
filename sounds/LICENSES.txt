@@ -2,3 +2,6 @@ smplr - MIT License - Copyright (c) Daniel Gómez (danigb) - https://github.com/
 FluidR3 GM SoundFont - Copyright (c) Frank Wen. Audio files rendered by midi-js-soundfonts (gleitz),
   https://github.com/gleitz/midi-js-soundfonts - licensed under Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/us/)
 Note: the audio files in this folder are the FluidR3_GM files of midi-js-soundfonts reduced to the notes the trainer uses (see tools/trim_sounds.py); samples are unchanged.
+
+Choir and pad instruments (choir_aahs, voice_oohs, pad_2_warm; middle range only) come from the same
+FluidR3 GM SoundFont (Frank Wen) via gleitz/midi-js-soundfonts, licence CC BY 3.0.
