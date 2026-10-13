@@ -273,6 +273,14 @@
   .about-body p{ margin: 0 0 8px; }
   .about-body ul{ margin: 6px 0 10px; padding-left: 18px; }
   .about-body li{ margin-bottom: 6px; }
+  .teacher-link{ display:block; margin: 2px auto 0; padding: 6px 4px; background: none; border: none; cursor: pointer; color: var(--muted); font: inherit; }
+  .teacher-link:hover{ color: var(--text); }
+  body.student .teacher-link{ display:none; }
+  #soundInfo .task-help{ text-align:left; font-family:'Inter', sans-serif; font-style: normal; font-size: 13.5px; line-height: 1.65; color: var(--muted);
+    margin-top: 20px; background: var(--bg-2); border: 1px solid var(--panel-line); border-radius: 12px; padding: 14px 16px; }
+  #soundInfo .task-help p{ margin: 0 0 8px; }
+  #soundInfo .task-help ol{ margin: 6px 0 10px; padding-left: 20px; }
+  #soundInfo .task-help li{ margin-bottom: 6px; }
   .about-body a{ color: var(--accent); overflow-wrap: anywhere; }
 
   @media (prefers-reduced-motion: reduce){ *{ transition: none !important; } }
@@ -349,6 +357,7 @@
       <summary id="aboutSummary">Про проєкт</summary>
       <div class="about-body" id="aboutBody"></div>
     </details>
+    <button type="button" class="teacher-link" id="teacherLink">Режим викладача</button>
     <p class="app-version" id="appVersion"></p>
   </footer>
 </div>
@@ -357,7 +366,7 @@
 (function(){
 
   // Shown, barely visible, at the bottom of the page. Raise it with every release.
-  const APP_VERSION = '2.3';
+  const APP_VERSION = '2.5';
   document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
   // ---------- synth audio engine ----------
@@ -834,7 +843,7 @@
     taskOpenBtn:         { ua:'Відкрити як учень', en:'Open as a student' },
     taskBannerPrefix:    { ua:'Завдання: ', en:'Task: ' },
     sendNameLabel:       { ua:'Ім’я та прізвище', en:'Full name' },
-    sendBtn:             { ua:'Надіслати результат викладачці', en:'Send the result to the teacher' },
+    sendBtn:             { ua:'Надіслати результат', en:'Send the result' },
     sendHint:            { ua:'Відкриється форма з уже заповненими відповідями. Перевірте їх і натисніть «Надіслати».', en:'A form opens with the answers already filled in. Check them and press "Submit".' },
     sendNeedName:        { ua:'Спершу введіть ім’я та прізвище.', en:'Please enter your full name first.' },
     rangeTitle:          { ua:'Діапазони звучання', en:'Pitch ranges' },
@@ -874,6 +883,23 @@
     aboutFree:           { ua:'Користування сайтом є безкоштовним.', en:'Using the site is free.' },
     aboutAuthorCredit:   { ua:'Створено викладачкою Катериною Кухарічевою (теорія музики, сольфеджіо, фортепіано, клавішні).',
                             en:'Created by music teacher Kateryna Kukharicheva (music theory, solfège, piano, keyboards).' },
+    teacherLink:         { ua:'Режим викладача', en:'Teacher mode' },
+    taskHelpHtml:        { ua:'<p><b>Як дати завдання учню</b></p><ol>'
+        + '<li>У вкладках «Інтервали», «Тризвуки», «Тембри», «Звук» і «Діапазон» налаштуйте вправу, потім поверніться сюди.</li>'
+        + '<li>Оберіть розділ, впишіть назву завдання й натисніть «Копіювати посилання». Надішліть його учню: він побачить лише вправу.</li>'
+        + '<li><b>Щоб отримувати результати</b> (необов’язково): створіть власну Google-форму з п’ятьма полями в такому порядку: «Ім’я та прізвище» (коротка відповідь, обов’язкове), «Завдання» (абзац), «Результат: правильних» (коротка відповідь), «Результат: всього» (коротка відповідь), «Деталі відповідей» (абзац).</li>'
+        + '<li>У формі натисніть «⋮» → «Отримати попередньо заповнене посилання», впишіть у поля числа <b>1, 2, 3, 4, 5</b> за порядком, натисніть «Отримати посилання» і вставте його в поле «Google-форма» в цій вкладці. Це робиться один раз; форма запам’ятовується лише в цьому браузері.</li>'
+        + '<li>Щоб результати приходили на пошту: у формі відкрийте «Відповіді» → «⋮» → «Отримувати сповіщення про нові відповіді».</li></ol>'
+        + '<p>Google-форму можна не підключати. Тоді в учня не буде кнопки «Надіслати результат»: він побачить результат і зможе скопіювати чи зберегти його та передати вам сам.</p>'
+        + '<p>Якщо форму підключено, наприкінці серії учень вводить ім’я й натискає «Надіслати результат»: відкривається ваша форма з готовими відповідями, залишається натиснути «Надіслати». Результат надходить у ту форму, яку ви вставили.</p>',
+                            en:'<p><b>How to give a task to a student</b></p><ol>'
+        + '<li>Set up the exercise in the Intervals, Triads, Timbres, Sound and Range tabs, then come back here.</li>'
+        + '<li>Pick the section, type a task name and press "Copy link". Send it to the student: they will see only the exercise.</li>'
+        + '<li><b>To receive results</b> (optional): create your own Google Form with five fields in this order: "Full name" (short answer, required), "Task" (paragraph), "Result: correct" (short answer), "Result: total" (short answer), "Answer details" (paragraph).</li>'
+        + '<li>In the form press "⋮" → "Get pre-filled link", type the numbers <b>1, 2, 3, 4, 5</b> into the fields in order, press "Get link" and paste it into the "Google Form" box in this tab. You do this once; the form is remembered in this browser only.</li>'
+        + '<li>To get results by email: in the form open "Responses" → "⋮" → "Get email notifications for new responses".</li></ol>'
+        + '<p>Connecting a Google Form is optional. Without it the student has no "Send the result" button: they see the result and can copy or save it and pass it on themselves.</p>'
+        + '<p>With a form connected, at the end of the series the student enters their name and presses "Send the result": your form opens with the answers filled in and they only press "Submit". The result goes to the form you pasted.</p>' },
     aboutComponents:     { ua:'Сайт використовує відкриті компоненти та ліцензії:', en:'This site uses open components and licenses:' },
     aboutEngine:         { ua:'Програвання звуку — бібліотека smplr (автор Daniel Gómez, danigb), ліцензія MIT:',
                             en:'Sound playback uses the smplr library (by Daniel Gómez, danigb), MIT license:' },
@@ -1001,6 +1027,7 @@
   const stageContent = document.getElementById('stageContent');
   const summaryPanel = document.getElementById('summaryPanel');
   const soundInfo = document.getElementById('soundInfo');
+  const teacherLinkEl = document.getElementById('teacherLink');
   const layoutGrid = document.getElementById('layoutGrid');
   const brandTag = document.getElementById('brandTag');
   const scoreCorrectLabel = document.getElementById('scoreCorrectLabel');
@@ -1079,6 +1106,15 @@
 
   soundHintClose.addEventListener('click', dismissSoundHint);
 
+  // The Sound tab shows one explanatory sentence; the Task tab adds the teacher's how-to under its sentence.
+  function renderSoundInfo(){
+    if(state.mode === 'task'){
+      soundInfo.innerHTML = '<p style="margin:0">' + escapeHtml(T('taskInfoText')) + '</p><div class="task-help">' + T('taskHelpHtml') + '</div>';
+    } else {
+      soundInfo.textContent = T('soundInfoText');
+    }
+  }
+
   function applyStaticTexts(){
     document.title = state.lang === 'en' ? 'Kamerton — Ear Training' : 'Камертон — тренування слуху';
     document.documentElement.lang = state.lang === 'en' ? 'en' : 'uk';
@@ -1095,7 +1131,8 @@
     footerEmailEl.textContent = contactEmail();
     aboutSummaryEl.textContent = T('aboutSummary');
     aboutBodyEl.innerHTML = aboutBodyHtml();
-    soundInfo.textContent = state.mode === 'task' ? T('taskInfoText') : T('soundInfoText');
+    renderSoundInfo();
+    teacherLinkEl.textContent = T('teacherLink');
     playBtn.title = T('playBtnTitle');
     replayBtn.textContent = T('replayBtn');
     resetSeriesBtn.title = T('resetSeriesBtnTitle');
@@ -1978,6 +2015,15 @@
     }
   }
 
+  // Visible way in for teachers (the 5 taps on the logo still work too).
+  teacherLinkEl.addEventListener('click', () => {
+    if(state.task) return;
+    setTeacher(true);
+    const tab = navModes.querySelector('button[data-mode="task"]');
+    if(tab) tab.click();
+    try{ window.scrollTo(0, 0); }catch(e){}
+  });
+
   let brandTaps = [];
   brandEl.addEventListener('click', () => {
     if(state.task) return;
@@ -2192,7 +2238,7 @@
         stageContent.style.display = 'none';
         summaryPanel.style.display = 'none';
         soundInfo.style.display = (state.mode === 'sound' || state.mode === 'task') ? '' : 'none';
-        soundInfo.textContent = state.mode === 'task' ? T('taskInfoText') : T('soundInfoText');
+        renderSoundInfo();
         seriesProgress.textContent = '';
         state.current = null;
       } else {
