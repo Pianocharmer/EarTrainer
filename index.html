@@ -282,13 +282,6 @@
   #soundInfo .task-help ol{ margin: 6px 0 10px; padding-left: 20px; }
   #soundInfo .task-help li{ margin-bottom: 6px; }
   .about-body a{ color: var(--accent); overflow-wrap: anywhere; }
-  .book-row{ display:flex; flex-wrap: wrap; align-items:center; gap: 8px 10px; margin: 2px 0 12px; }
-  .book-title{ color: var(--text); }
-  .about-body a.book-btn{
-    font-family:'Inter', sans-serif; font-size: 13px; font-weight: 500; text-decoration: none;
-    border: 1px solid rgba(232,161,60,0.45); padding: 7px 16px; border-radius: 999px;
-  }
-  .about-body a.book-btn:hover{ background: rgba(232,161,60,0.1); }
 
   @media (prefers-reduced-motion: reduce){ *{ transition: none !important; } }
 </style>
@@ -373,7 +366,7 @@
 (function(){
 
   // Shown, barely visible, at the bottom of the page. Raise it with every release.
-  const APP_VERSION = '2.6';
+  const APP_VERSION = '2.7';
   document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
 
   // ---------- synth audio engine ----------
@@ -907,7 +900,7 @@
         + '<li>To get results by email: in the form open "Responses" → "⋮" → "Get email notifications for new responses".</li></ol>'
         + '<p>Connecting a Google Form is optional. Without it the student has no "Send the result" button: they see the result and can copy or save it and pass it on themselves.</p>'
         + '<p>With a form connected, at the end of the series the student enters their name and presses "Send the result": your form opens with the answers filled in and they only press "Submit". The result goes to the form you pasted.</p>' },
-    bookTitle:           { ua:'Запис на заняття:', en:'Book a lesson:' },
+    bookTitle:           { ua:'Записатись на заняття:', en:'Book a lesson:' },
     aboutComponents:     { ua:'Сайт використовує відкриті компоненти та ліцензії:', en:'This site uses open components and licenses:' },
     aboutEngine:         { ua:'Програвання звуку — бібліотека smplr (автор Daniel Gómez, danigb), ліцензія MIT:',
                             en:'Sound playback uses the smplr library (by Daniel Gómez, danigb), MIT license:' },
@@ -1074,10 +1067,9 @@
     return '<p>' + escapeHtml(T('aboutIntro')) + '</p>' +
       '<p>' + escapeHtml(T('aboutMission')) + '</p>' +
       '<p>' + escapeHtml(T('aboutFree')) + '</p>' +
-      '<p>' + escapeHtml(T('aboutAuthorCredit')) + '</p>' +
-      '<div class="book-row"><span class="book-title">' + escapeHtml(T('bookTitle')) + '</span>' +
-        '<a class="book-btn" href="https://instagram.com/klavishy" target="_blank" rel="noopener noreferrer">Instagram</a>' +
-        '<a class="book-btn" href="https://t.me/kattiere" target="_blank" rel="noopener noreferrer">Telegram</a></div>' +
+      '<p>' + escapeHtml(T('aboutAuthorCredit')) + ' ' + escapeHtml(T('bookTitle')) + ' ' +
+        '<a href="https://instagram.com/klavishy" target="_blank" rel="noopener noreferrer">Instagram</a>, ' +
+        '<a href="https://t.me/kattiere" target="_blank" rel="noopener noreferrer">Telegram</a></p>' +
       '<p>' + escapeHtml(T('aboutComponents')) + '</p>' +
       '<ul>' +
         '<li>' + escapeHtml(T('aboutEngine')) + ' ' + link('https://github.com/danigb/smplr', 'smplr') + '</li>' +
